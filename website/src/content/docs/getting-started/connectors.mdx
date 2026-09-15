@@ -1,0 +1,85 @@
+---
+title: Connectors
+description: Connect Raya to discord.js, Eris, Oceanic or any other Discord library.
+---
+
+import { Tabs, TabItem, Aside } from '@astrojs/starlight/components';
+
+Lavalink plays the audio, but Discord only tells **your bot** where to connect. A connector does three things:
+
+1. Sends opcode 4 (join/leave voice) to the right shard.
+2. Forwards raw gateway events (`VOICE_STATE_UPDATE`, `VOICE_SERVER_UPDATE`, `GUILD_CREATE`, …) to `raya.handleRaw()`.
+3. Calls `raya.init(botUserId)` once Discord is ready.
+
+<Tabs syncKey="library">
+  <TabItem label="discord.js">
+    ```js
+    const { Raya, Connectors } = require('raya.js');
+
+    const raya = new Raya({
+      nodes,
+      connector: new Connectors.DiscordJS(client), // before client.login()
+    });
+    ```
+  </TabItem>
+  <TabItem label="Eris">
+    ```js
+    const raya = new Raya({
+      nodes,
+      connector: new Connectors.Eris(client), // before client.connect()
+    });
+    ```
+  </TabItem>
+  <TabItem label="Oceanic">
+    ```js
+    const raya = new Raya({
+      nodes,
+      connector: new Connectors.Oceanic(client), // before client.connect()
+    });
+    ```
+  </TabItem>
+  <TabItem label="Any library">
+    ```js
+    const raya = new Raya({
+      nodes,
+      // Send the opcode 4 payload through the shard that owns the guild
+      send: (guildId, payload) => getShardFor(guildId).send(payload),
+    });
+
+    // Forward every raw dispatch packet ({ t, d })
+    gateway.on('dispatch', (packet) => raya.handleRaw(packet));
+
+    // Once logged in
+    await raya.init(botUserId);
+    ```
+  </TabItem>
+</Tabs>
+
+<Aside type="caution" title="Create the connector before logging in">
+Raya tracks who is in which voice channel from `GUILD_CREATE` packets. That powers the empty-channel detection in [auto-leave](../../guides/auto-leave/). If the connector attaches after login, those packets are missed.
+</Aside>
+
+## Writing your own connector
+
+A connector is any object with `attach` and `send`. Add `getToken` to enable [voice channel status](../../guides/voice-status/) without passing a token.
+
+```ts
+import type { Connector, Raya } from 'raya.js';
+
+class MyConnector implements Connector {
+  constructor(private client: MyClient) {}
+
+  attach(raya: Raya) {
+    this.client.on('raw', (packet) => raya.handleRaw(packet));
+    this.client.once('ready', () => raya.init(this.client.user.id));
+  }
+
+  send(guildId: string, payload) {
+    this.client.shardFor(guildId).send(payload);
+  }
+
+  getToken() {
+    return this.client.token;
+  }
+}
+```

@@ -1,0 +1,73 @@
+{
+  "name": "raya.js",
+  "version": "1.0.0",
+  "description": "A fast, resilient Lavalink v4 client for Node.js: session resuming, restart-proof players, automatic failover, queue, filters, autoplay, voice channel status and a live now-playing feed.",
+  "author": "neuzgg",
+  "license": "MIT",
+  "homepage": "https://neuzgg.github.io/raya/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/neuzgg/raya.git"
+  },
+  "bugs": {
+    "url": "https://github.com/neuzgg/raya/issues"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "module": "dist/index.mjs",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      },
+      "require": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node scripts/build-esm.js",
+    "dev": "tsc -p tsconfig.json --watch",
+    "typecheck": "tsc -p tsconfig.test.json --noEmit",
+    "pretest": "tsc -p tsconfig.test.json",
+    "test": "node --test --test-reporter=spec \"build/test/**/*.test.js\"",
+    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true});require('fs').rmSync('build',{recursive:true,force:true})\"",
+    "prepublishOnly": "npm run clean && npm run build && npm test"
+  },
+  "keywords": [
+    "raya",
+    "lavalink",
+    "lavalink-v4",
+    "lavalink-client",
+    "nodelink",
+    "discord",
+    "discord-bot",
+    "music",
+    "music-bot",
+    "audio",
+    "discord.js",
+    "eris",
+    "oceanic"
+  ],
+  "engines": {
+    "node": ">=18.17.0"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/ws": "^8.5.13",
+    "discord.js": "^14.27.0",
+    "typescript": "^5.7.2"
+  }
+}

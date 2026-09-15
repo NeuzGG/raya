@@ -1,0 +1,223 @@
+---
+import { link } from '../../utils/links';
+
+const features = [
+  {
+    title: 'Restart-proof players',
+    text: 'raya.shutdown() saves every player. The next process resumes the same Lavalink session, and the music never pauses.',
+    href: 'guides/restarts/',
+    icon: 'M4 12a8 8 0 0 1 13.6-5.7L20 8.5M20 4v4.5h-4.5M20 12a8 8 0 0 1-13.6 5.7L4 15.5M4 20v-4.5h4.5',
+    accent: 'var(--coral)',
+  },
+  {
+    title: 'Automatic failover',
+    text: 'A node dies? Players move to a healthy node at the same position, with the same filters and voice connection.',
+    href: 'guides/resilience/',
+    icon: 'M12 3 4 6.5v5c0 4.5 3.3 8.6 8 9.5 4.7-.9 8-5 8-9.5v-5L12 3Zm-3 9 2 2 4-4',
+    accent: 'var(--mint)',
+  },
+  {
+    title: 'Request batching',
+    text: 'setVolume(), pause() and filters.nightcore() in the same tick become one PATCH, always sent in order.',
+    href: 'guides/filters/',
+    icon: 'M4 7h9M4 12h6M4 17h9M15 9l5 3-5 3',
+    accent: 'var(--amber)',
+  },
+  {
+    title: 'Smart autoplay',
+    text: 'YouTube mixes, LavaSrc recommendations, then more from the same artist. Works with Spotify even without Extended quota.',
+    href: 'guides/autoplay/',
+    icon: 'M9 18V5l11-2v13M9 18a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm11-2a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z',
+    accent: 'var(--rose)',
+  },
+  {
+    title: 'Voice channel status',
+    text: 'Show "Now playing" on the voice channel with your own template, with no stale status after fast skips.',
+    href: 'guides/voice-status/',
+    icon: 'M11 5 6 9H3v6h3l5 4V5Zm5.5 3.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12',
+    accent: 'var(--sky)',
+  },
+  {
+    title: 'Auto-leave that never guesses',
+    text: 'Leave or pause when the channel empties. Raya only acts on complete voice data, so it never leaves too early.',
+    href: 'guides/auto-leave/',
+    icon: 'M16 17l5-5-5-5M21 12H9M12 21H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h6',
+    accent: 'var(--violet)',
+  },
+  {
+    title: 'Any Discord library',
+    text: 'Connectors for discord.js, Eris and Oceanic, or pass a send function and feed raw packets from anything.',
+    href: 'getting-started/connectors/',
+    icon: 'M8 7 3 12l5 5M16 7l5 5-5 5M14 4l-4 16',
+    accent: 'var(--coral)',
+  },
+  {
+    title: 'Typed from end to end',
+    text: 'Typed events, a typed requester through declaration merging, and RayaError with stable codes you can switch on.',
+    href: 'guides/typescript/',
+    icon: 'M4 4h16v16H4zM9 9h6M12 9v7',
+    accent: 'var(--mint)',
+  },
+  {
+    title: 'Plugins built in',
+    text: 'LavaLyrics with live lines, SponsorBlock, LavaSearch, route planner and plugin filters, no extra glue needed.',
+    href: 'guides/lavalink-plugins/',
+    icon: 'M12 2v4M12 18v4M4.9 4.9l2.8 2.8M16.3 16.3l2.8 2.8M2 12h4M18 12h4M4.9 19.1l2.8-2.8M16.3 7.7l2.8-2.8',
+    accent: 'var(--amber)',
+  },
+];
+---
+
+<section class="section" id="features">
+  <div class="container">
+    <header class="section-head" data-reveal>
+      <span class="eyebrow">Everything included</span>
+      <h2>Built for bots that people <span class="gradient-text">actually listen to</span></h2>
+      <p>The hard parts of Lavalink, handled for you: sessions, failover, voice, queues and state across restarts.</p>
+    </header>
+
+    <div class="grid" data-spotlight>
+      {
+        features.map((feature, i) => (
+          <a class="card" href={link(feature.href)} data-reveal style={`--delay: ${(i % 3) * 0.08}s; --accent: ${feature.accent}`}>
+            <span class="icon">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d={feature.icon} />
+              </svg>
+            </span>
+            <h3>{feature.title}</h3>
+            <p>{feature.text}</p>
+            <span class="more">
+              Learn more
+              <svg viewBox="0 0 16 16" aria-hidden="true">
+                <path d="M3 8h10M9 4l4 4-4 4" />
+              </svg>
+            </span>
+          </a>
+        ))
+      }
+    </div>
+  </div>
+</section>
+
+<script>
+  document.querySelectorAll<HTMLElement>('[data-spotlight]').forEach((grid) => {
+    grid.addEventListener('pointermove', (event) => {
+      for (const card of grid.querySelectorAll<HTMLElement>('.card')) {
+        const rect = card.getBoundingClientRect();
+        card.style.setProperty('--mx', `${event.clientX - rect.left}px`);
+        card.style.setProperty('--my', `${event.clientY - rect.top}px`);
+      }
+    });
+  });
+</script>
+
+<style>
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+  }
+  .card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+    padding: 1.6rem;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    background: var(--surface);
+    overflow: hidden;
+    isolation: isolate;
+    transition: transform 0.4s var(--ease-out), border-color 0.3s, box-shadow 0.4s;
+  }
+  .card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: radial-gradient(420px circle at var(--mx, -500px) var(--my, -500px), color-mix(in srgb, var(--accent) 16%, transparent), transparent 45%);
+    transition: opacity 0.3s;
+  }
+  .card::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    padding: 1px;
+    border-radius: inherit;
+    background: radial-gradient(260px circle at var(--mx, -500px) var(--my, -500px), color-mix(in srgb, var(--accent) 70%, transparent), transparent 50%);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+  .card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 24px 50px -30px color-mix(in srgb, var(--accent) 60%, transparent);
+  }
+  .icon {
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    margin-bottom: 0.4rem;
+    border-radius: 12px;
+    color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 13%, transparent);
+    border: 1px solid color-mix(in srgb, var(--accent) 25%, transparent);
+    transition: transform 0.5s var(--ease-spring);
+  }
+  .card:hover .icon {
+    transform: rotate(-8deg) scale(1.08);
+  }
+  .icon svg {
+    width: 22px;
+    height: 22px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  h3 {
+    margin: 0;
+    font-family: var(--display);
+    font-size: 1.22rem;
+    letter-spacing: -0.02em;
+  }
+  p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.95rem;
+    flex: 1;
+  }
+  .more {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin-top: 0.5rem;
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--accent);
+  }
+  .more svg {
+    width: 14px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    transition: transform 0.3s var(--ease-out);
+  }
+  .card:hover .more svg {
+    transform: translateX(4px);
+  }
+  @media (max-width: 960px) {
+    .grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+  @media (max-width: 600px) {
+    .grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

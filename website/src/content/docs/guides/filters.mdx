@@ -1,0 +1,95 @@
+---
+title: Filters
+description: Bass boost, nightcore, 8D, equalizer presets and plugin filters.
+---
+
+import { Aside, LinkCard } from '@astrojs/starlight/components';
+
+Every filter call applies right away, so there's no `.apply()`. Calls in the same tick share one request:
+
+```js
+// One PATCH to Lavalink, not three
+await Promise.all([
+  player.filters.bassBoost('high'),
+  player.filters.nightcore(),
+  player.setVolume(90),
+]);
+```
+
+<LinkCard
+  title="Try the Filter Lab"
+  description="Toggle filters and see the exact payload Raya sends to Lavalink."
+  href="../../tools/filter-lab/"
+/>
+
+## Presets
+
+```js
+await player.filters.bassBoost('medium'); // 'off' | 'low' | 'medium' | 'high' | 'extreme' | 0-1
+await player.filters.nightcore();         // nightcore(false) turns it off
+await player.filters.vaporwave();
+await player.filters.eightD();            // eightD(true, rotationHz)
+await player.filters.karaoke();
+await player.filters.soft();
+await player.filters.tremolo();
+await player.filters.vibrato();
+```
+
+`bassBoost` only changes equalizer bands 0 to 4, so it combines with an equalizer preset.
+
+## Equalizer
+
+```js
+await player.filters.setEqualizerPreset('rock');
+// flat, bass, pop, rock, electronic, classical, soft, treble, vocal
+
+await player.filters.setEqualizer([
+  { band: 0, gain: 0.2 },  // band 0-14, gain -0.25 to 1 (clamped)
+  { band: 1, gain: 0.15 },
+]);
+await player.filters.clearEqualizer();
+```
+
+## Speed, pitch and more
+
+```js
+await player.filters.setSpeed(1.25);
+await player.filters.setPitch(0.9);
+await player.filters.setRate(1.1);
+await player.filters.setTimescale({ speed: 1, pitch: 1.2, rate: 1 });
+await player.filters.setVolume(1.5);   // 0-5 multiplier, separate from player volume
+await player.filters.setRotation({ rotationHz: 0.3 });
+await player.filters.setLowPass({ smoothing: 20 });
+await player.filters.setKaraoke(null); // null removes a filter
+```
+
+Also available: `setTremolo`, `setVibrato`, `setDistortion`, `setChannelMix`.
+
+<Aside type="note">
+Timescale changes also affect `player.position`, so progress bars stay accurate at nightcore speed.
+</Aside>
+
+## Bulk changes
+
+```js
+await player.filters.set({ timescale: { speed: 1.2 }, rotation: { rotationHz: 0.2 } }); // replace all
+await player.filters.patch({ rotation: null, lowPass: { smoothing: 15 } });            // merge
+await player.filters.clear();
+```
+
+## Plugin filters
+
+Filters from Lavalink plugins (for example LavaDSPX) go under `pluginFilters`:
+
+```js
+await player.filters.setPluginFilter('echo', { /* shape defined by the plugin */ });
+await player.filters.setPluginFilter('echo', null); // remove
+```
+
+## Reading state
+
+```js
+player.filters.active;          // ['equalizer', 'timescale']
+player.filters.value;           // the payload sent to Lavalink
+player.filters.speedMultiplier; // speed × rate
+```

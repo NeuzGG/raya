@@ -1,0 +1,93 @@
+---
+title: Installation
+description: Install Raya and get a Lavalink server ready.
+---
+
+import { Tabs, TabItem, Steps, Aside } from '@astrojs/starlight/components';
+
+## Requirements
+
+- **Node.js 18.17 or newer**. Raya uses the built-in `fetch`.
+- A **Lavalink v4** server (or NodeLink). Lavalink v3 is not supported.
+- A Discord bot with the **Guilds** and **Guild Voice States** intents.
+
+## Install the package
+
+<Tabs syncKey="pkg">
+  <TabItem label="npm">
+    ```sh
+    npm install raya.js
+    ```
+  </TabItem>
+  <TabItem label="pnpm">
+    ```sh
+    pnpm add raya.js
+    ```
+  </TabItem>
+  <TabItem label="yarn">
+    ```sh
+    yarn add raya.js
+    ```
+  </TabItem>
+  <TabItem label="bun">
+    ```sh
+    bun add raya.js
+    ```
+  </TabItem>
+</Tabs>
+
+Raya works with both module systems:
+
+<Tabs syncKey="module">
+  <TabItem label="ESM / TypeScript">
+    ```ts
+    import { Raya, Connectors } from 'raya.js';
+    // default import works too
+    import Raya from 'raya.js';
+    ```
+  </TabItem>
+  <TabItem label="CommonJS">
+    ```js
+    const { Raya, Connectors } = require('raya.js');
+    ```
+  </TabItem>
+</Tabs>
+
+## Set up Lavalink
+
+<Steps>
+
+1. Download `Lavalink.jar` from the [Lavalink releases](https://github.com/lavalink-devs/Lavalink/releases) and install Java 17 or newer.
+
+2. Create an `application.yml` next to it. Pick a strong password and add the plugins you need:
+
+   ```yaml title="application.yml"
+   server:
+     port: 2333
+   lavalink:
+     server:
+       password: "youshallnotpass"
+     plugins:
+       # YouTube support
+       - dependency: "dev.lavalink.youtube:youtube-plugin:VERSION"
+       # Spotify, Apple Music, Deezer and more
+       - dependency: "com.github.topi314.lavasrc:lavasrc-plugin:VERSION"
+   ```
+
+3. Start it:
+
+   ```sh
+   java -jar Lavalink.jar
+   ```
+
+4. Use the same host, port and password in Raya's `nodes` option.
+
+</Steps>
+
+<Aside type="tip" title="Which sources work?">
+YouTube needs the **youtube-source** plugin. Spotify, Apple Music, Deezer, Yandex, Tidal, JioSaavn, VK and Qobuz need **LavaSrc**. SoundCloud and Bandcamp are built in. See [Search and sources](../../guides/search/).
+</Aside>
+
+## Next
+
+Head to the [quick start](../quick-start/) to play your first track.

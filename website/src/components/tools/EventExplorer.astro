@@ -1,0 +1,359 @@
+---
+import { EVENTS } from '../../data/events';
+import { highlight } from '../../scripts/highlight';
+
+const categories = ['All', ...new Set(EVENTS.map((event) => event.category))];
+const count = (category: string) =>
+  category === 'All' ? EVENTS.length : EVENTS.filter((event) => event.category === category).length;
+---
+
+<div class="not-content raya-widget explorer" data-event-explorer>
+  <div class="toolbar">
+    <label class="search">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10.5 3a7.5 7.5 0 0 1 5.96 12.06l4.24 4.24-1.4 1.4-4.24-4.24A7.5 7.5 0 1 1 10.5 3Zm0 2a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11Z" /></svg>
+      <input type="search" placeholder="Search events, arguments or descriptions" aria-label="Search events" autocomplete="off" />
+      <kbd aria-hidden="true">/</kbd>
+    </label>
+    <div class="chips" role="group" aria-label="Filter by category">
+      {
+        categories.map((category, i) => (
+          <button type="button" class="chip" data-category={category} aria-pressed={i === 0 ? 'true' : 'false'}>
+            {category}
+            <span class="chip-count">{count(category)}</span>
+          </button>
+        ))
+      }
+    </div>
+  </div>
+
+  <p class="summary" aria-live="polite"><span data-shown>{EVENTS.length}</span> of {EVENTS.length} events</p>
+
+  <ul class="list">
+    {
+      EVENTS.map((event) => (
+        <li
+          class="item"
+          data-category={event.category}
+          data-text={`${event.name} ${event.args} ${event.description}`.toLowerCase()}
+          style={`--cat: var(--cat-${event.category.toLowerCase()})`}
+        >
+          <details>
+            <summary>
+              <code class="name">{event.name}</code>
+              <span class="tag">{event.category}</span>
+              <span class="desc">{event.description}</span>
+              <svg class="chevron" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="m9 6 6 6-6 6" />
+              </svg>
+            </summary>
+            <div class="body">
+              <div class="args">
+                <span>Arguments</span>
+                <code>{event.args}</code>
+              </div>
+              <div class="code">
+                <button type="button" class="copy" data-copy={event.example}>
+                  Copy
+                </button>
+                <pre><code set:html={highlight(event.example)} /></pre>
+              </div>
+            </div>
+          </details>
+        </li>
+      ))
+    }
+  </ul>
+  <p class="empty" hidden>No events match your search.</p>
+</div>
+
+<script>
+  document.querySelectorAll<HTMLElement>('[data-event-explorer]').forEach((root) => {
+    const input = root.querySelector('input')!;
+    const chips = [...root.querySelectorAll<HTMLButtonElement>('.chip')];
+    const items = [...root.querySelectorAll<HTMLLIElement>('.item')];
+    const shown = root.querySelector('[data-shown]')!;
+    const empty = root.querySelector<HTMLElement>('.empty')!;
+    let category = 'All';
+
+    const apply = () => {
+      const terms = input.value.toLowerCase().trim().split(/\s+/).filter(Boolean);
+      let visible = 0;
+      for (const item of items) {
+        const matchesCategory = category === 'All' || item.dataset.category === category;
+        const matchesText = terms.every((term) => item.dataset.text!.includes(term));
+        item.hidden = !(matchesCategory && matchesText);
+        if (!item.hidden) visible++;
+      }
+      shown.textContent = String(visible);
+      empty.hidden = visible > 0;
+      if (terms.length && visible === 1) items.find((item) => !item.hidden)?.querySelector('details')?.setAttribute('open', '');
+    };
+
+    input.addEventListener('input', apply);
+    chips.forEach((chip) =>
+      chip.addEventListener('click', () => {
+        category = chip.dataset.category!;
+        chips.forEach((c) => c.setAttribute('aria-pressed', String(c === chip)));
+        apply();
+      }),
+    );
+
+    document.addEventListener('keydown', (event) => {
+      const target = event.target as HTMLElement;
+      if (event.key !== '/' || target.closest('input, textarea, [contenteditable]')) return;
+      event.preventDefault();
+      input.focus();
+    });
+
+    root.querySelectorAll<HTMLButtonElement>('.copy').forEach((button) =>
+      button.addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText(button.dataset.copy!);
+          button.textContent = 'Copied!';
+        } catch {
+          button.textContent = 'Press Ctrl+C';
+        }
+        setTimeout(() => (button.textContent = 'Copy'), 1500);
+      }),
+    );
+  });
+</script>
+
+<style>
+  .explorer {
+    --cat-lifecycle: #9aa3ff;
+    --cat-node: #45d6b5;
+    --cat-player: #ffb547;
+    --cat-track: #ff7a45;
+    --cat-queue: #ff4d8d;
+    --cat-plugin: #7cc7ff;
+    padding: 1rem;
+  }
+  :global(:root[data-theme='light']) .explorer {
+    --cat-lifecycle: #4f5bd5;
+    --cat-node: #0f8f73;
+    --cat-player: #a86b00;
+    --cat-track: #cf4a17;
+    --cat-queue: #c2185b;
+    --cat-plugin: #1f63b5;
+  }
+  .toolbar {
+    display: grid;
+    gap: 0.75rem;
+  }
+  .search {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.55rem 0.8rem;
+    border: 1px solid var(--sl-color-gray-5);
+    border-radius: 0.7rem;
+    background: var(--sl-color-black);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .search:focus-within {
+    border-color: var(--sl-color-accent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--sl-color-accent) 25%, transparent);
+  }
+  .search svg {
+    width: 1.1rem;
+    fill: var(--sl-color-gray-3);
+    flex: none;
+  }
+  .search input {
+    flex: 1;
+    min-width: 0;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: var(--sl-color-white);
+    font-size: 0.95rem;
+  }
+  .search kbd {
+    font-family: var(--sl-font-mono);
+    font-size: 0.75rem;
+    padding: 0.05rem 0.4rem;
+    border: 1px solid var(--sl-color-gray-5);
+    border-radius: 0.35rem;
+    color: var(--sl-color-gray-3);
+  }
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.3rem 0.7rem;
+    border: 1px solid var(--sl-color-gray-5);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--sl-color-gray-2);
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s, border-color 0.2s, transform 0.15s;
+  }
+  .chip:hover {
+    border-color: var(--sl-color-gray-4);
+    transform: translateY(-1px);
+  }
+  .chip[aria-pressed='true'] {
+    background: var(--sl-color-accent);
+    border-color: var(--sl-color-accent);
+    color: var(--sl-color-black);
+  }
+  .chip-count {
+    font-size: 0.72rem;
+    opacity: 0.75;
+  }
+  .summary {
+    margin: 0.85rem 0 0.5rem;
+    font-size: 0.8rem;
+    color: var(--sl-color-gray-3);
+  }
+  .list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 0.4rem;
+  }
+  .item details {
+    border: 1px solid var(--sl-color-gray-5);
+    border-left: 3px solid var(--cat);
+    border-radius: 0.6rem;
+    background: var(--sl-color-black);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .item details:hover,
+  .item details[open] {
+    box-shadow: 0 6px 24px -12px color-mix(in srgb, var(--cat) 60%, transparent);
+  }
+  summary {
+    display: grid;
+    grid-template-columns: auto auto 1fr auto;
+    align-items: center;
+    gap: 0.65rem;
+    padding: 0.6rem 0.8rem;
+    cursor: pointer;
+    list-style: none;
+  }
+  summary::-webkit-details-marker {
+    display: none;
+  }
+  .name {
+    font-family: var(--sl-font-mono);
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--sl-color-white);
+  }
+  .tag {
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 0.1rem 0.45rem;
+    border-radius: 999px;
+    color: var(--cat);
+    background: color-mix(in srgb, var(--cat) 14%, transparent);
+  }
+  .desc {
+    font-size: 0.85rem;
+    color: var(--sl-color-gray-3);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+  }
+  details[open] .desc {
+    white-space: normal;
+  }
+  .chevron {
+    width: 1rem;
+    fill: none;
+    stroke: var(--sl-color-gray-3);
+    stroke-width: 2;
+    transition: transform 0.25s;
+  }
+  details[open] .chevron {
+    transform: rotate(90deg);
+  }
+  .body {
+    padding: 0 0.8rem 0.8rem;
+    display: grid;
+    gap: 0.6rem;
+    animation: open 0.25s ease-out;
+  }
+  @keyframes open {
+    from {
+      opacity: 0;
+      transform: translateY(-4px);
+    }
+  }
+  .args {
+    display: grid;
+    gap: 0.25rem;
+    font-size: 0.75rem;
+    color: var(--sl-color-gray-3);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .args code {
+    text-transform: none;
+    letter-spacing: 0;
+    font-size: 0.82rem;
+    color: var(--sl-color-gray-1);
+    font-family: var(--sl-font-mono);
+    overflow-wrap: anywhere;
+  }
+  .code {
+    position: relative;
+    border-radius: 0.5rem;
+    background: var(--sl-color-gray-6);
+    border: 1px solid var(--sl-color-gray-5);
+  }
+  .code pre {
+    margin: 0;
+    padding: 0.75rem 0.9rem;
+    overflow-x: auto;
+    font-family: var(--sl-font-mono);
+    font-size: 0.8rem;
+    line-height: 1.6;
+    color: var(--tok-text);
+  }
+  .copy {
+    position: absolute;
+    top: 0.4rem;
+    right: 0.4rem;
+    padding: 0.15rem 0.55rem;
+    border: 1px solid var(--sl-color-gray-5);
+    border-radius: 0.4rem;
+    background: var(--sl-color-black);
+    color: var(--sl-color-gray-2);
+    font-size: 0.72rem;
+    cursor: pointer;
+  }
+  .copy:hover {
+    color: var(--sl-color-white);
+    border-color: var(--sl-color-gray-4);
+  }
+  .empty {
+    text-align: center;
+    color: var(--sl-color-gray-3);
+    padding: 1.5rem;
+  }
+  @media (max-width: 40rem) {
+    summary {
+      grid-template-columns: auto 1fr auto;
+    }
+    .desc {
+      grid-column: 1 / -1;
+      grid-row: 2;
+      white-space: normal;
+    }
+    .tag {
+      justify-self: start;
+    }
+  }
+</style>

@@ -1,0 +1,61 @@
+---
+title: Filters
+description: Every method of a player's Filters.
+---
+
+All setters apply immediately and resolve when Lavalink has the change. Calls in the same tick are merged into one request. Invalid arguments throw `INVALID_ARGUMENT` right away.
+
+## Properties
+
+| Property | Type | Description |
+| --- | --- | --- |
+| `value` | `FilterOptions` | The payload sent to Lavalink |
+| `active` | `string[]` | Names of active filters |
+| `speedMultiplier` | `number` | Timescale speed × rate |
+
+## Presets
+
+| Method | Description |
+| --- | --- |
+| `bassBoost(level = 'medium')` | `'off'`, `'low'`, `'medium'`, `'high'`, `'extreme'` or `0`-`1`. Changes bands 0-4 only |
+| `nightcore(enabled = true)` | Timescale `speed 1.1, pitch 1.125, rate 1.05` |
+| `vaporwave(enabled = true)` | Timescale `speed 0.85, pitch 0.8` |
+| `eightD(enabled = true, rotationHz = 0.2)` | Rotation |
+| `karaoke(enabled = true)` | Karaoke filter |
+| `soft(enabled = true)` | Low pass, smoothing 20 |
+| `tremolo(enabled = true, frequency = 4, depth = 0.75)` | Tremolo |
+| `vibrato(enabled = true, frequency = 4, depth = 0.75)` | Vibrato |
+
+## Equalizer
+
+| Method | Description |
+| --- | --- |
+| `setEqualizer(bands)` | `[{ band: 0-14, gain: -0.25..1 }]`, merged with existing bands |
+| `setEqualizerPreset(name)` | `flat`, `bass`, `pop`, `rock`, `electronic`, `classical`, `soft`, `treble`, `vocal` |
+| `clearEqualizer()` | Reset every band |
+
+## Individual filters
+
+Pass `null` to remove a filter.
+
+| Method | Description |
+| --- | --- |
+| `setVolume(multiplier)` | 0-5, where 1 is unchanged |
+| `setTimescale({ speed?, pitch?, rate? } \| null)` | Each value must be greater than 0 |
+| `setSpeed(n)` / `setPitch(n)` / `setRate(n)` | Change one timescale value |
+| `setKaraoke(options \| null)` | `level`, `monoLevel`, `filterBand`, `filterWidth` |
+| `setTremolo(options \| null)` | `frequency`, `depth` |
+| `setVibrato(options \| null)` | `frequency`, `depth` |
+| `setRotation(options \| null)` | `rotationHz` |
+| `setDistortion(options \| null)` | `sinOffset`, `sinScale`, `cosOffset`, `cosScale`, `tanOffset`, `tanScale`, `offset`, `scale` |
+| `setChannelMix(options \| null)` | `leftToLeft`, `leftToRight`, `rightToLeft`, `rightToRight` |
+| `setLowPass(options \| null)` | `smoothing` |
+| `setPluginFilter(name, value \| null)` | Lavalink plugin filters |
+
+## Bulk
+
+| Method | Description |
+| --- | --- |
+| `set(filters)` | Replace all filters |
+| `patch(filters)` | Merge; `null` values remove filters |
+| `clear()` | Remove every filter |

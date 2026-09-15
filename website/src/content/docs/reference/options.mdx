@@ -1,0 +1,99 @@
+---
+title: Options
+description: Every option for Raya, nodes and players.
+---
+
+import { LinkCard } from '@astrojs/starlight/components';
+
+<LinkCard
+  title="Config Builder"
+  description="Pick options with clicks and copy the generated code."
+  href="../../tools/config-builder/"
+/>
+
+## Raya options
+
+```ts
+new Raya(options: RayaOptions)
+```
+
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| `nodes` | `NodeOptions[]` | required | Lavalink nodes |
+| `connector` | `Connector` | – | Discord library connector. Either this or `send` is required |
+| `send` | `(guildId, payload) => void` | – | Sends opcode 4 payloads yourself |
+| `defaultSearchSource` | `string` | `'youtube'` | Alias or prefix used for plain queries |
+| `playerDefaults` | `PlayerDefaults` | see below | Defaults for every player |
+| `debug` | `boolean \| (message) => void` | `false` | Log debug messages |
+| `voiceStatus` | `boolean \| VoiceStatusOptions` | off | [Voice channel status](../../guides/voice-status/) |
+| `searchCache` | `{ maxSize, ttl } \| false` | `{ maxSize: 500, ttl: 300000 }` | Search result cache |
+| `failover` | `{ enabled, delay }` | `{ enabled: true, delay: 5000 }` | Move players off dead nodes |
+| `autoplayResolver` | `(player, lastTrack) => Promise<Track \| null>` | built-in | Custom [autoplay](../../guides/autoplay/) |
+| `requesterTransformer` | `(requester) => Requester` | – | Shape requesters before storing |
+| `nodeSelector` | `(nodes, { region, guildId }) => Node \| undefined` | penalty balancer | Custom node selection |
+| `restore` | `RayaSnapshot` | – | Snapshot from a previous process |
+| `clientName` | `string` | `Raya/<version>` | `Client-Name` header |
+
+## Player defaults
+
+`playerDefaults` applies to every player. Most of these can be overridden per player in `createPlayer` / `join`.
+
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| `volume` | `number` | `100` | 0-1000, 100 is unchanged |
+| `selfDeaf` | `boolean` | `true` | Deafen the bot in voice |
+| `selfMute` | `boolean` | `false` | Mute the bot in voice |
+| `loop` | `'off' \| 'track' \| 'queue'` | `'off'` | Loop mode |
+| `autoplay` | `boolean` | `false` | Continue with related tracks |
+| `maxQueueSize` | `number` | `10000` | Queue capacity |
+| `historySize` | `number` | `50` | Played tracks remembered |
+| `queueEndTimeout` | `number \| false` | `false` | ms after queue end before leaving |
+| `emptyChannelTimeout` | `number \| false` | `false` | ms after the channel empties before leaving |
+| `pauseOnEmpty` | `boolean` | `false` | Pause while nobody is listening |
+| `skipOnStuck` | `boolean` | `true` | Skip tracks Lavalink reports as stuck |
+| `destroyOnVoiceDisconnect` | `boolean` | `true` | Destroy when kicked from voice |
+| `voiceTimeout` | `number` | `15000` | ms `connect()` waits for voice |
+
+## Node options
+
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| `name` | `string` | `host:port` | Unique name |
+| `host` | `string` | required | Hostname or IP |
+| `port` | `number` | `2333`, or `443` when secure | Port |
+| `password` | `string` | required | Lavalink password |
+| `secure` | `boolean` | `false` | Use `wss://` and `https://` |
+| `regions` | `string[]` | `[]` | Voice regions for routing, e.g. `['ams', 'eu']` |
+| `resumeTimeout` | `number` | `60` | Seconds Lavalink keeps the session; `0` disables |
+| `requestTimeout` | `number` | `10000` | REST timeout in ms |
+| `pingInterval` | `number` | `20000` | WebSocket ping interval in ms |
+| `retry.maxAttempts` | `number` | `Infinity` | Reconnect attempts |
+| `retry.baseDelay` | `number` | `1000` | First reconnect delay in ms |
+| `retry.maxDelay` | `number` | `30000` | Maximum reconnect delay in ms |
+| `sessionId` | `string` | – | Resume this session on first connect |
+
+## Create player options
+
+```ts
+raya.createPlayer(options) / raya.join(options & { timeout?: number })
+```
+
+| Option | Type | Description |
+| --- | --- | --- |
+| `guildId` | `string` | Required |
+| `voiceChannelId` | `string` | Required |
+| `textChannelId` | `string \| null` | Stored on the player for your messages |
+| `node` | `string \| Node` | Force a node |
+| `region` | `string` | Preferred voice region |
+| `volume`, `loop`, `autoplay`, `selfDeaf`, `selfMute` | | Override player defaults |
+
+## Voice status options
+
+| Option | Type | Default |
+| --- | --- | --- |
+| `template` | `string \| (track, player) => string` | `'Now playing: {title}'` |
+| `token` | `string` | from the connector |
+| `clearOnEnd` | `boolean` | `true` |
+| `reason` | `string` | – |
+| `apiBase` | `string` | `'https://discord.com/api/v10'` |
+| `onError` | `(error, channelId) => void` | – |

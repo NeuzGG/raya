@@ -1,0 +1,76 @@
+---
+title: Failover and resilience
+description: What Raya does when networks, Lavalink or Discord misbehave.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+Raya is built to recover on its own. This page explains what happens in each failure case.
+
+| Situation | What Raya does |
+| --- | --- |
+| WebSocket drops briefly | Reconnects with backoff and **resumes** the session. Players aren't touched. |
+| Connection silently dies | A WebSocket ping timeout ends it, then Raya reconnects and resumes. |
+| Lavalink restarts (session lost) | **Rebuilds** every player: track, position, volume, filters and voice. |
+| A node stays down | After `failover.delay` (5 s), players **move** to the best remaining node. |
+| No other node is ready | Players wait and move to the first node that becomes ready. |
+| Discord voice session invalid (4006, 4009, 4015) | Rejoins the voice channel. |
+| Bot kicked, channel or guild deleted | Destroys the player and frees it on Lavalink. |
+| Wrong node password | `nodeError` with `NODE_AUTH_FAILED`, and no reconnect attempts. |
+| Search on an unreachable node | Retries on the next best node. |
+
+## Session resuming
+
+On every new session Raya tells Lavalink to keep it for `resumeTimeout` seconds. When the connection comes back, it sends the v4 `Session-Id` header. If Lavalink resumes the session, Raya syncs player state from the server, with nothing replayed.
+
+```js
+nodes: [{ host, port, password, resumeTimeout: 120 }] // seconds; 0 disables resuming
+```
+
+## Reconnecting
+
+Reconnects use exponential backoff with jitter, and retry forever by default:
+
+```js
+nodes: [{
+  host, port, password,
+  retry: { maxAttempts: Infinity, baseDelay: 1000, maxDelay: 30_000 },
+  pingInterval: 20_000, // dead-connection detection
+}]
+```
+
+<Aside type="note">
+Idle nodes with no players stay connected. Liveness is checked with WebSocket pings, not player updates. LavaFlow dropped idle nodes after about a minute.
+</Aside>
+
+## Failover
+
+```js
+new Raya({ nodes, connector, failover: { enabled: true, delay: 5000 } });
+
+raya.on('playerNodeMove', (player, from, to) => {
+  console.log(`${player.guildId} moved from ${from.name} to ${to.name}`);
+});
+```
+
+The delay gives a node the chance to come back and resume first. When players move, they keep their track, position, filters, volume and voice connection, because the Discord voice credentials are reused.
+
+## Load balancing
+
+New players go to the node with the lowest **penalty**. Raya uses Lavalink's own formula (playing players, CPU load, dropped and missing audio frames), plus players it has assigned since the last stats update, so a burst of new players is spread evenly.
+
+```js
+raya.bestNode();          // the least loaded ready node
+raya.getNode('main').penalty;
+```
+
+Give nodes `regions` and new players are routed to the node closest to their Discord voice server:
+
+```js
+nodes: [
+  { name: 'us', host: 'us.example.com', password, regions: ['us', 'atl', 'iad'] },
+  { name: 'eu', host: 'eu.example.com', password, regions: ['ams', 'fra', 'eu'] },
+]
+```
+
+For full control, pass your own `nodeSelector: (nodes, { region, guildId }) => node`.

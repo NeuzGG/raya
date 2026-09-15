@@ -1,0 +1,56 @@
+---
+title: Auto-leave
+description: Leave when the queue ends or everyone leaves the voice channel.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+```js
+new Raya({
+  nodes,
+  connector,
+  playerDefaults: {
+    queueEndTimeout: 120_000,    // leave 2 minutes after the queue ends
+    emptyChannelTimeout: 60_000, // leave 1 minute after the last listener leaves
+    pauseOnEmpty: true,          // pause while nobody is listening
+  },
+});
+```
+
+All three are off by default.
+
+## Queue end
+
+When the queue ends (and autoplay found nothing), the player is destroyed after `queueEndTimeout` ms. Playing anything before then cancels it. The destroy reason is `'queueEnd'`.
+
+## Empty channel
+
+Raya reads raw gateway events to know who is in each voice channel. No Discord library cache is needed.
+
+- When the last human leaves, `voiceChannelEmpty` fires. With `pauseOnEmpty`, playback pauses.
+- When someone comes back, `voiceChannelFilled` fires, and if Raya paused it, playback resumes.
+- If the channel is still empty after `emptyChannelTimeout` ms, the player is destroyed with reason `'channelEmpty'`.
+
+```js
+raya.on('voiceChannelEmpty', (player) => notify(player, 'Paused until someone joins'));
+raya.on('playerDestroy', (player, reason) => {
+  if (reason === 'channelEmpty') notify(player, 'Left because everyone left');
+});
+```
+
+Bots don't count as listeners.
+
+<Aside type="note" title="No false alarms">
+Raya only judges a channel after it has seen that guild's `GUILD_CREATE` packet. It never guesses from partial data, so it won't leave a channel that still has listeners. This needs the **Guild Voice States** intent and a connector created before login.
+</Aside>
+
+## Other reasons a player is destroyed
+
+| Reason | When |
+| --- | --- |
+| `'voiceDisconnected'` | The bot was kicked or disconnected from voice |
+| `'channelDeleted'` | The voice channel was deleted |
+| `'guildDeleted'` | The bot left or was removed from the guild |
+| `'manual'` | You called `destroy()` |
+
+Set `playerDefaults.destroyOnVoiceDisconnect: false` to keep players after a kick.

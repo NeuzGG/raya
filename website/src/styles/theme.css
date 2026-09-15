@@ -1,0 +1,119 @@
+/* Raya brand theme for Starlight. Dark is the default; light overrides below. */
+
+:root {
+  --raya-coral: #ff7a45;
+  --raya-amber: #ffb547;
+  --raya-rose: #ff4d8d;
+  --raya-mint: #45d6b5;
+  --raya-gradient: linear-gradient(120deg, var(--raya-rose), var(--raya-coral) 45%, var(--raya-amber));
+  --raya-display: 'Bricolage Grotesque Variable', 'Inter Variable', system-ui, sans-serif;
+
+  --sl-font: 'Inter Variable', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --sl-font-mono: 'JetBrains Mono Variable', ui-monospace, 'Cascadia Code', monospace;
+
+  --sl-color-accent-low: #3a1a14;
+  --sl-color-accent: #ff7a45;
+  --sl-color-accent-high: #ffd3bf;
+
+  --sl-color-white: #f4f5fb;
+  --sl-color-gray-1: #e3e5ef;
+  --sl-color-gray-2: #c2c6d6;
+  --sl-color-gray-3: #9398ad;
+  --sl-color-gray-4: #5b6076;
+  --sl-color-gray-5: #34384a;
+  --sl-color-gray-6: #1b1d2a;
+  --sl-color-black: #0c0d15;
+}
+
+:root[data-theme='light'] {
+  --sl-color-accent-low: #ffe3d6;
+  --sl-color-accent: #d9481c;
+  --sl-color-accent-high: #6e2008;
+
+  --sl-color-white: #14151d;
+  --sl-color-gray-1: #262836;
+  --sl-color-gray-2: #3d4052;
+  --sl-color-gray-3: #626679;
+  --sl-color-gray-4: #9095a8;
+  --sl-color-gray-5: #d5d8e2;
+  --sl-color-gray-6: #eef0f5;
+  --sl-color-gray-7: #f7f7fa;
+  --sl-color-black: #ffffff;
+}
+
+/* Headings use the display face */
+.sl-markdown-content :is(h1, h2, h3),
+h1#_top,
+.hero h1 {
+  font-family: var(--raya-display);
+  letter-spacing: -0.02em;
+}
+
+h1#_top {
+  font-weight: 750;
+}
+
+/* Brand gradient on the site title */
+.site-title span {
+  font-family: var(--raya-display);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+/* Softer, rounder cards and asides */
+.sl-markdown-content .card,
+.sl-markdown-content .starlight-aside {
+  border-radius: 0.75rem;
+}
+
+.sl-markdown-content table {
+  display: table;
+  width: 100%;
+  border-radius: 0.5rem;
+}
+
+.sl-markdown-content :not(pre) > code {
+  border-radius: 0.35rem;
+  padding: 0.1em 0.35em;
+}
+
+/* Subtle accent underline for links inside content */
+.sl-markdown-content a:not(.card, .sl-link-card, .sl-link-button) {
+  text-decoration-color: color-mix(in srgb, var(--sl-color-accent) 45%, transparent);
+  text-underline-offset: 0.2em;
+}
+
+.sl-markdown-content a:not(.card, .sl-link-card, .sl-link-button):hover {
+  text-decoration-color: var(--sl-color-accent);
+}
+
+/* Tool widgets toggle visibility with the hidden attribute; never let a display rule override it. */
+[hidden] {
+  display: none !important;
+}
+
+/* Shared styles for interactive tool widgets inside docs */
+.raya-widget {
+  --w-bg: var(--sl-color-gray-6);
+  --w-border: var(--sl-color-gray-5);
+  margin-block: 1.5rem;
+  border: 1px solid var(--w-border);
+  border-radius: 1rem;
+  background: var(--w-bg);
+  overflow: hidden;
+}
+
+.raya-widget :is(button, select, input) {
+  font: inherit;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

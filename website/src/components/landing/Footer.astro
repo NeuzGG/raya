@@ -1,0 +1,194 @@
+---
+import { SITE } from '../../site.mjs';
+import { link } from '../../utils/links';
+
+const columns = [
+  {
+    title: 'Docs',
+    links: [
+      ['Introduction', 'getting-started/introduction/'],
+      ['Quick start', 'getting-started/quick-start/'],
+      ['Connectors', 'getting-started/connectors/'],
+      ['Migrating from LavaFlow', 'guides/migrating-from-lavaflow/'],
+    ],
+  },
+  {
+    title: 'Guides',
+    links: [
+      ['Players', 'guides/players/'],
+      ['Autoplay', 'guides/autoplay/'],
+      ['Restarts', 'guides/restarts/'],
+      ['Voice status', 'guides/voice-status/'],
+    ],
+  },
+  {
+    title: 'Tools',
+    links: [
+      ['Config Builder', 'tools/config-builder/'],
+      ['Filter Lab', 'tools/filter-lab/'],
+      ['Event Explorer', 'tools/event-explorer/'],
+      ['API reference', 'reference/raya/'],
+    ],
+  },
+];
+---
+
+<section class="final">
+  <div class="container">
+    <div class="cta-card" data-reveal>
+      <div class="glow" aria-hidden="true"></div>
+      <h2>Ready when your bot is.</h2>
+      <p>Install Raya, connect a node, and let it handle the hard parts.</p>
+      <div class="actions">
+        <a class="btn btn-primary" href={link('getting-started/quick-start/')}>
+          Start building
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 8h10M9 4l4 4-4 4" /></svg>
+        </a>
+        <a class="btn btn-ghost" href={SITE.github} rel="noopener">Star on GitHub</a>
+      </div>
+      <code class="install">npm install {SITE.npm}</code>
+    </div>
+  </div>
+</section>
+
+<footer class="footer">
+  <div class="container cols">
+    <div class="about">
+      <a class="brand" href={link('/')}>
+        <img src={link('favicon.svg')} alt="" width="28" height="28" />
+        {SITE.name}
+      </a>
+      <p>The Lavalink v4 client that keeps the music playing.</p>
+      <p class="small">MIT License · Built with Astro and Starlight</p>
+    </div>
+    {
+      columns.map((column) => (
+        <nav aria-label={column.title}>
+          <h3>{column.title}</h3>
+          <ul>
+            {column.links.map(([label, href]) => (
+              <li>
+                <a href={link(href!)}>{label}</a>
+              </li>
+            ))}
+          </ul>
+        </nav>
+      ))
+    }
+  </div>
+</footer>
+
+<style>
+  .final {
+    padding: clamp(40px, 8vw, 100px) 0;
+  }
+  .cta-card {
+    position: relative;
+    overflow: hidden;
+    display: grid;
+    justify-items: center;
+    gap: 0.4rem;
+    padding: clamp(40px, 7vw, 80px) 24px;
+    border-radius: 28px;
+    border: 1px solid var(--border-strong);
+    background: var(--surface);
+    text-align: center;
+    isolation: isolate;
+  }
+  .glow {
+    position: absolute;
+    inset: -40% -20% auto;
+    height: 140%;
+    z-index: -1;
+    background: conic-gradient(from 180deg at 50% 50%, rgba(255, 77, 141, 0.35), rgba(255, 122, 69, 0.3), rgba(255, 181, 71, 0.25), rgba(124, 178, 255, 0.2), rgba(255, 77, 141, 0.35));
+    filter: blur(70px);
+    opacity: 0.55;
+    animation: turn 16s linear infinite;
+  }
+  @keyframes turn {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  h2 {
+    margin: 0;
+    font-family: var(--display);
+    font-size: clamp(2rem, 5vw, 3.4rem);
+    letter-spacing: -0.035em;
+    line-height: 1.05;
+  }
+  .cta-card p {
+    margin: 0 0 1rem;
+    color: var(--muted);
+    font-size: 1.08rem;
+  }
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.6rem;
+  }
+  .install {
+    margin-top: 1.1rem;
+    font-family: var(--mono);
+    font-size: 0.9rem;
+    color: var(--muted);
+  }
+  .footer {
+    border-top: 1px solid var(--border);
+    padding: 48px 0 56px;
+    background: var(--bg-2);
+  }
+  .cols {
+    display: grid;
+    grid-template-columns: 1.4fr repeat(3, 1fr);
+    gap: 32px;
+  }
+  .brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-family: var(--display);
+    font-weight: 750;
+    font-size: 1.2rem;
+  }
+  .about p {
+    margin: 0.6rem 0 0;
+    color: var(--muted);
+    font-size: 0.93rem;
+  }
+  .about .small {
+    font-size: 0.82rem;
+    color: var(--faint);
+  }
+  h3 {
+    margin: 0 0 0.7rem;
+    font-size: 0.78rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+  ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 0.45rem;
+  }
+  ul a {
+    color: var(--muted);
+    font-size: 0.93rem;
+    transition: color 0.2s;
+  }
+  ul a:hover {
+    color: var(--text);
+  }
+  @media (max-width: 800px) {
+    .cols {
+      grid-template-columns: 1fr 1fr;
+    }
+    .about {
+      grid-column: 1 / -1;
+    }
+  }
+</style>

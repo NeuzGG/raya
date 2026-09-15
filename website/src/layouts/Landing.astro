@@ -1,0 +1,86 @@
+---
+import '@fontsource-variable/inter';
+import '@fontsource-variable/bricolage-grotesque';
+import '@fontsource-variable/jetbrains-mono';
+import '../styles/landing.css';
+import '../styles/tokens.css';
+import { SITE } from '../site.mjs';
+import { link } from '../utils/links';
+
+interface Props {
+  title?: string;
+  description?: string;
+}
+
+const { title = `${SITE.name}: ${SITE.tagline}`, description = SITE.description } = Astro.props;
+---
+
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta name="twitter:card" content="summary" />
+    <meta name="theme-color" content="#090a11" />
+    <link rel="icon" href={link('favicon.svg')} type="image/svg+xml" />
+    <script is:inline>
+      // Same storage key as Starlight, so the theme follows you between the landing page and the docs.
+      (() => {
+        document.documentElement.classList.add('js');
+        let stored = null;
+        try {
+          stored = localStorage.getItem('starlight-theme');
+        } catch {}
+        const theme =
+          stored === 'light' || stored === 'dark'
+            ? stored
+            : matchMedia('(prefers-color-scheme: light)').matches
+              ? 'light'
+              : 'dark';
+        document.documentElement.dataset.theme = theme;
+      })();
+    </script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <slot />
+    <script>
+      const reveal = document.querySelectorAll<HTMLElement>('[data-reveal]');
+      if ('IntersectionObserver' in window) {
+        const observer = new IntersectionObserver(
+          (entries) => {
+            for (const entry of entries) {
+              if (!entry.isIntersecting) continue;
+              entry.target.classList.add('is-visible');
+              observer.unobserve(entry.target);
+            }
+          },
+          { rootMargin: '0px 0px -8% 0px', threshold: 0.12 },
+        );
+        reveal.forEach((el) => observer.observe(el));
+      } else {
+        reveal.forEach((el) => el.classList.add('is-visible'));
+      }
+    </script>
+    <style>
+      .skip-link {
+        position: absolute;
+        left: 12px;
+        top: -60px;
+        z-index: 100;
+        padding: 0.5rem 0.9rem;
+        border-radius: 10px;
+        background: var(--surface);
+        border: 1px solid var(--border-strong);
+      }
+      .skip-link:focus {
+        top: 12px;
+      }
+    </style>
+  </body>
+</html>

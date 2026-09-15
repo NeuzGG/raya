@@ -1,0 +1,93 @@
+---
+title: Lavalink plugins
+description: Lyrics, SponsorBlock, LavaSearch, route planner and custom plugin endpoints.
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+Raya has built-in support for popular Lavalink plugins, and raw access for everything else.
+
+<Tabs>
+  <TabItem label="LavaLyrics">
+    ```js
+    // Lyrics for the current track (null when none were found)
+    const lyrics = await player.getLyrics();
+    console.log(lyrics?.text ?? lyrics?.lines.map((l) => l.line).join('\n'));
+
+    // Live, time-synced lines while the track plays
+    await player.subscribeLyrics();
+    raya.on('lyricsLine', (player, line, index, skipped) => {
+      console.log(`[${line.timestamp}ms] ${line.line}`);
+    });
+    raya.on('lyricsNotFound', (player) => {});
+    await player.unsubscribeLyrics();
+
+    // Lyrics for any encoded track
+    await raya.bestNode().rest.getLyrics(track.encoded);
+    ```
+  </TabItem>
+  <TabItem label="SponsorBlock">
+    ```js
+    // Skip sponsor segments on YouTube tracks
+    await player.setSponsorBlock(['sponsor', 'selfpromo', 'interaction', 'intro', 'outro']);
+    await player.setSponsorBlock([]); // turn off
+
+    raya.on('segmentsLoaded', (player, segments) => {});
+    raya.on('segmentSkipped', (player, segment) => {});
+    raya.on('chaptersLoaded', (player, chapters) => {});
+    raya.on('chapterStarted', (player, chapter) => {});
+    ```
+  </TabItem>
+  <TabItem label="LavaSearch">
+    ```js
+    // Tracks, albums, artists, playlists and text in one request
+    const rich = await raya.bestNode().rest.loadSearch('daft punk', ['track', 'album', 'artist']);
+    rich?.albums.forEach((album) => console.log(album.info.name));
+    ```
+  </TabItem>
+  <TabItem label="Route planner">
+    ```js
+    const node = raya.getNode('main');
+    const status = await node.rest.routePlannerStatus();
+    await node.rest.unmarkFailedAddress('1.2.3.4');
+    await node.rest.unmarkAllFailedAddresses();
+    ```
+  </TabItem>
+</Tabs>
+
+## Checking what a node supports
+
+Raya fetches each node's `/v4/info` when it connects:
+
+```js
+const node = raya.getNode('main');
+node.hasPlugin('lavasrc-plugin');
+node.hasSource('spotify');
+node.hasFilter('timescale');
+node.info?.version.semver;
+```
+
+## Plugin events
+
+Known plugin events have their own names (above). Every non-core event is also emitted as `pluginEvent`:
+
+```js
+raya.on('pluginEvent', (player, event) => {
+  if (event.type === 'MyPluginEvent') console.log(event);
+});
+```
+
+## Custom endpoints
+
+`node.rest.request` sends authenticated requests to any endpoint, with timeouts, safe retries for `GET`, and `RestError` on failure:
+
+```js
+const data = await node.rest.request('GET', '/v4/my-plugin/status');
+await node.rest.request('POST', '/v4/my-plugin/thing', { body: { enabled: true } });
+```
+
+## Plugin filters
+
+```js
+await player.filters.setPluginFilter('echo', { /* shape defined by the plugin */ });
+```

@@ -1,0 +1,546 @@
+---
+const presets = ['none', 'flat', 'bass', 'pop', 'rock', 'electronic', 'classical', 'soft', 'treble', 'vocal'];
+const bands = ['25', '40', '63', '100', '160', '250', '400', '630', '1k', '1.6k', '2.5k', '4k', '6.3k', '10k', '16k'];
+---
+
+<div class="not-content raya-widget lab" data-filter-lab>
+  <div class="grid">
+    <div class="controls">
+      <fieldset>
+        <legend>Bass boost</legend>
+        <div class="segmented" data-control="bass">
+          {['off', 'low', 'medium', 'high', 'extreme'].map((level, i) => (
+            <button type="button" data-value={level} aria-pressed={i === 0 ? 'true' : 'false'}>{level}</button>
+          ))}
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Equalizer preset</legend>
+        <div class="segmented wrap" data-control="preset">
+          {presets.map((preset, i) => (
+            <button type="button" data-value={preset} aria-pressed={i === 0 ? 'true' : 'false'}>{preset}</button>
+          ))}
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Timescale</legend>
+        <div class="segmented" data-control="timescale">
+          {['none', 'nightcore', 'vaporwave', 'custom'].map((mode, i) => (
+            <button type="button" data-value={mode} aria-pressed={i === 0 ? 'true' : 'false'}>{mode}</button>
+          ))}
+        </div>
+        <div class="sliders" data-custom hidden>
+          <label>Speed <output data-out="speed">1.00×</output><input type="range" min="0.5" max="2" step="0.05" value="1" data-range="speed" /></label>
+          <label>Pitch <output data-out="pitch">1.00×</output><input type="range" min="0.5" max="2" step="0.05" value="1" data-range="pitch" /></label>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Effects</legend>
+        <div class="toggles">
+          {[
+            ['eightD', '8D audio'],
+            ['karaoke', 'Karaoke'],
+            ['soft', 'Soft'],
+            ['tremolo', 'Tremolo'],
+            ['vibrato', 'Vibrato'],
+          ].map(([key, label]) => (
+            <label class="switch">
+              <input type="checkbox" data-toggle={key} />
+              <span class="track"><span class="thumb" /></span>
+              {label}
+            </label>
+          ))}
+        </div>
+        <div class="sliders" data-rotation hidden>
+          <label>Rotation <output data-out="rotation">0.20 Hz</output><input type="range" min="0.05" max="1" step="0.05" value="0.2" data-range="rotation" /></label>
+        </div>
+        <div class="sliders">
+          <label>Filter volume <output data-out="volume">1.0×</output><input type="range" min="0" max="5" step="0.1" value="1" data-range="volume" /></label>
+        </div>
+      </fieldset>
+
+      <button type="button" class="reset" data-reset>Reset all</button>
+    </div>
+
+    <div class="output">
+      <div class="panel eq" aria-label="Equalizer bands">
+        <div class="panel-head">
+          <span>Equalizer</span>
+          <span class="speed" data-speed>1.00× speed</span>
+        </div>
+        <div class="bars">
+          {bands.map((label) => (
+            <div class="band">
+              <div class="bar-wrap"><div class="bar" /></div>
+              <span>{label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <span>Your code</span>
+          <button type="button" class="copy" data-copy-target="code">Copy</button>
+        </div>
+        <pre data-code></pre>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <span>Sent to Lavalink <em>PATCH /v4/sessions/:id/players/:guild</em></span>
+          <button type="button" class="copy" data-copy-target="json">Copy</button>
+        </div>
+        <pre data-json></pre>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  import { highlight } from '../../scripts/highlight';
+
+  // Mirrors src/player/Filters.ts in the Raya package.
+  const PRESETS: Record<string, number[]> = {
+    flat: Array(15).fill(0),
+    bass: [0.2, 0.15, 0.1, 0.05, 0, -0.05, -0.1, -0.1, -0.1, -0.1, -0.1, -0.1, -0.1, -0.1, -0.1],
+    pop: [-0.02, -0.01, 0.08, 0.1, 0.15, 0.1, 0.03, -0.02, -0.035, -0.05, -0.05, -0.05, -0.05, -0.05, -0.05],
+    rock: [0.3, 0.25, 0.2, 0.1, 0.05, -0.05, -0.15, -0.2, -0.1, -0.05, 0.05, 0.1, 0.2, 0.25, 0.3],
+    electronic: [0.375, 0.35, 0.125, 0, 0, -0.125, -0.125, 0, 0.25, 0.125, 0.15, 0.2, 0.25, 0.35, 0.4],
+    classical: [0.375, 0.35, 0.125, 0, 0, 0.125, 0.55, 0.05, 0.125, 0.25, 0.2, 0.25, 0.3, 0.25, 0.3],
+    soft: [0, 0, 0, 0, 0, 0, 0, 0, -0.25, -0.25, -0.25, -0.25, -0.25, -0.25, -0.25],
+    treble: [-0.1, -0.1, -0.1, -0.05, 0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5],
+    vocal: [-0.2, -0.15, -0.1, 0, 0.15, 0.25, 0.3, 0.3, 0.25, 0.15, 0, -0.05, -0.1, -0.1, -0.1],
+  };
+  const BASS: Record<string, number> = { low: 0.1, medium: 0.2, high: 0.35, extreme: 0.6 };
+  const BASS_SHAPE = [1, 0.85, 0.65, 0.4, 0.15];
+  const round = (n: number) => Math.round(n * 10000) / 10000;
+  const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(min, n));
+
+  document.querySelectorAll<HTMLElement>('[data-filter-lab]').forEach((root) => {
+    const state = {
+      bass: 'off',
+      preset: 'none',
+      timescale: 'none',
+      speed: 1,
+      pitch: 1,
+      rotation: 0.2,
+      volume: 1,
+      eightD: false,
+      karaoke: false,
+      soft: false,
+      tremolo: false,
+      vibrato: false,
+    };
+    type Key = keyof typeof state;
+    const initial = { ...state };
+
+    const q = <T extends Element>(selector: string) => root.querySelector<T>(selector)!;
+    const bars = [...root.querySelectorAll<HTMLElement>('.bar')];
+    const codeEl = q<HTMLElement>('[data-code]');
+    const jsonEl = q<HTMLElement>('[data-json]');
+    let plainCode = '';
+    let plainJson = '';
+
+    function compute() {
+      const gains = state.preset === 'none' ? Array(15).fill(0) : [...PRESETS[state.preset]!];
+      if (state.bass !== 'off') {
+        BASS_SHAPE.forEach((factor, band) => (gains[band] = clamp(BASS[state.bass]! * factor, -0.25, 1)));
+      }
+      const filters: Record<string, unknown> = {};
+      if (state.volume !== 1) filters.volume = state.volume;
+      const equalizer = gains.map((gain, band) => ({ band, gain: round(gain) })).filter((b) => b.gain !== 0);
+      if (equalizer.length) filters.equalizer = equalizer;
+      if (state.karaoke) filters.karaoke = { level: 1, monoLevel: 1, filterBand: 220, filterWidth: 100 };
+      if (state.timescale === 'nightcore') filters.timescale = { speed: 1.1, pitch: 1.125, rate: 1.05 };
+      if (state.timescale === 'vaporwave') filters.timescale = { speed: 0.85, pitch: 0.8, rate: 1 };
+      if (state.timescale === 'custom') filters.timescale = { speed: state.speed, pitch: state.pitch };
+      if (state.tremolo) filters.tremolo = { frequency: 4, depth: 0.75 };
+      if (state.vibrato) filters.vibrato = { frequency: 4, depth: 0.75 };
+      if (state.eightD) filters.rotation = { rotationHz: state.rotation };
+      if (state.soft) filters.lowPass = { smoothing: 20 };
+
+      const calls: string[] = [];
+      if (state.volume !== 1) calls.push(`player.filters.setVolume(${state.volume})`);
+      if (state.preset !== 'none') calls.push(`player.filters.setEqualizerPreset('${state.preset}')`);
+      if (state.bass !== 'off') calls.push(`player.filters.bassBoost('${state.bass}')`);
+      if (state.timescale === 'nightcore') calls.push('player.filters.nightcore()');
+      if (state.timescale === 'vaporwave') calls.push('player.filters.vaporwave()');
+      if (state.timescale === 'custom') calls.push(`player.filters.setTimescale({ speed: ${state.speed}, pitch: ${state.pitch} })`);
+      if (state.eightD) calls.push(state.rotation === 0.2 ? 'player.filters.eightD()' : `player.filters.eightD(true, ${state.rotation})`);
+      if (state.karaoke) calls.push('player.filters.karaoke()');
+      if (state.soft) calls.push('player.filters.soft()');
+      if (state.tremolo) calls.push('player.filters.tremolo()');
+      if (state.vibrato) calls.push('player.filters.vibrato()');
+
+      if (calls.length === 0) plainCode = '// No filters\nawait player.filters.clear();';
+      else if (calls.length === 1) plainCode = `await ${calls[0]};`;
+      else plainCode = `// Same tick, so Raya sends one request\nawait Promise.all([\n${calls.map((c) => `  ${c},`).join('\n')}\n]);`;
+
+      plainJson = JSON.stringify({ filters }, null, 2);
+      codeEl.innerHTML = highlight(plainCode);
+      jsonEl.innerHTML = highlight(plainJson);
+
+      gains.forEach((gain, i) => {
+        const bar = bars[i]!;
+        const pct = ((gain + 0.25) / 1.25) * 100;
+        bar.style.setProperty('--h', `${Math.max(4, pct)}%`);
+        bar.classList.toggle('neg', gain < 0);
+      });
+      const ts = filters.timescale as { speed?: number; rate?: number } | undefined;
+      const speed = (ts?.speed ?? 1) * (ts?.rate ?? 1);
+      q<HTMLElement>('[data-speed]').textContent = `${speed.toFixed(2)}× speed`;
+      root.style.setProperty('--anim-speed', String(speed));
+      root.classList.toggle('spin', state.eightD);
+      root.style.setProperty('--rot', `${Math.max(0.6, 5 * (1 - state.rotation))}s`);
+    }
+
+    function syncControls() {
+      root.querySelectorAll<HTMLElement>('.segmented').forEach((group) => {
+        const key = group.dataset.control as Key;
+        group.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.value === state[key])));
+      });
+      root.querySelectorAll<HTMLInputElement>('[data-toggle]').forEach((input) => {
+        input.checked = Boolean(state[input.dataset.toggle as Key]);
+      });
+      root.querySelectorAll<HTMLInputElement>('[data-range]').forEach((input) => {
+        const key = input.dataset.range as Key;
+        input.value = String(state[key]);
+        const out = root.querySelector(`[data-out="${key}"]`)!;
+        const v = Number(state[key]);
+        out.textContent = key === 'rotation' ? `${v.toFixed(2)} Hz` : key === 'volume' ? `${v.toFixed(1)}×` : `${v.toFixed(2)}×`;
+      });
+      q<HTMLElement>('[data-custom]').hidden = state.timescale !== 'custom';
+      q<HTMLElement>('[data-rotation]').hidden = !state.eightD;
+    }
+
+    root.querySelectorAll<HTMLElement>('.segmented').forEach((group) =>
+      group.addEventListener('click', (event) => {
+        const button = (event.target as HTMLElement).closest('button');
+        if (!button) return;
+        (state as Record<string, unknown>)[group.dataset.control!] = button.dataset.value;
+        syncControls();
+        compute();
+      }),
+    );
+    root.querySelectorAll<HTMLInputElement>('[data-toggle]').forEach((input) =>
+      input.addEventListener('change', () => {
+        (state as Record<string, unknown>)[input.dataset.toggle!] = input.checked;
+        syncControls();
+        compute();
+      }),
+    );
+    root.querySelectorAll<HTMLInputElement>('[data-range]').forEach((input) =>
+      input.addEventListener('input', () => {
+        (state as Record<string, unknown>)[input.dataset.range!] = Number(input.value);
+        syncControls();
+        compute();
+      }),
+    );
+    q<HTMLButtonElement>('[data-reset]').addEventListener('click', () => {
+      Object.assign(state, initial);
+      syncControls();
+      compute();
+    });
+    root.querySelectorAll<HTMLButtonElement>('[data-copy-target]').forEach((button) =>
+      button.addEventListener('click', async () => {
+        const text = button.dataset.copyTarget === 'code' ? plainCode : plainJson;
+        try {
+          await navigator.clipboard.writeText(text);
+          button.textContent = 'Copied!';
+        } catch {
+          button.textContent = 'Select to copy';
+        }
+        setTimeout(() => (button.textContent = 'Copy'), 1500);
+      }),
+    );
+
+    syncControls();
+    compute();
+  });
+</script>
+
+<style>
+  .lab {
+    padding: 1rem;
+    --anim-speed: 1;
+  }
+  .grid {
+    display: grid;
+    gap: 1rem;
+  }
+  @media (min-width: 64rem) {
+    .grid {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+      align-items: start;
+    }
+    .output {
+      position: sticky;
+      top: calc(var(--sl-nav-height, 4rem) + 1rem);
+    }
+  }
+  fieldset {
+    border: 0;
+    margin: 0 0 1rem;
+    padding: 0;
+  }
+  legend {
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--sl-color-gray-3);
+    margin-bottom: 0.45rem;
+  }
+  .segmented {
+    display: inline-flex;
+    flex-wrap: nowrap;
+    padding: 0.2rem;
+    gap: 0.15rem;
+    border: 1px solid var(--sl-color-gray-5);
+    border-radius: 0.65rem;
+    background: var(--sl-color-black);
+    max-width: 100%;
+    overflow-x: auto;
+  }
+  .segmented.wrap {
+    flex-wrap: wrap;
+  }
+  .segmented button {
+    padding: 0.3rem 0.65rem;
+    border: 0;
+    border-radius: 0.45rem;
+    background: transparent;
+    color: var(--sl-color-gray-2);
+    font-size: 0.82rem;
+    text-transform: capitalize;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.2s, color 0.2s;
+  }
+  .segmented button:hover {
+    color: var(--sl-color-white);
+    background: var(--sl-color-gray-6);
+  }
+  .segmented button[aria-pressed='true'] {
+    background: var(--raya-gradient);
+    color: #fff;
+    box-shadow: 0 4px 14px -6px var(--raya-coral);
+  }
+  .toggles {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem 1.1rem;
+  }
+  .switch {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.88rem;
+    color: var(--sl-color-gray-1);
+    cursor: pointer;
+  }
+  .switch input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .switch .track {
+    position: relative;
+    width: 2.1rem;
+    height: 1.2rem;
+    border-radius: 999px;
+    background: var(--sl-color-gray-5);
+    transition: background 0.2s;
+  }
+  .switch .thumb {
+    position: absolute;
+    top: 0.15rem;
+    left: 0.15rem;
+    width: 0.9rem;
+    height: 0.9rem;
+    border-radius: 50%;
+    background: #fff;
+    transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .switch input:checked + .track {
+    background: var(--raya-coral);
+  }
+  .switch input:checked + .track .thumb {
+    transform: translateX(0.9rem);
+  }
+  .switch input:focus-visible + .track {
+    outline: 2px solid var(--sl-color-accent);
+    outline-offset: 2px;
+  }
+  .sliders {
+    display: grid;
+    gap: 0.5rem;
+    margin-top: 0.7rem;
+  }
+  .sliders label {
+    display: grid;
+    grid-template-columns: 6.5rem 3.8rem 1fr;
+    align-items: center;
+    font-size: 0.85rem;
+    color: var(--sl-color-gray-2);
+  }
+  .sliders output {
+    font-family: var(--sl-font-mono);
+    font-size: 0.8rem;
+    color: var(--sl-color-white);
+  }
+  input[type='range'] {
+    accent-color: var(--raya-coral);
+    width: 100%;
+  }
+  .reset {
+    padding: 0.4rem 0.9rem;
+    border: 1px solid var(--sl-color-gray-5);
+    border-radius: 0.55rem;
+    background: transparent;
+    color: var(--sl-color-gray-2);
+    cursor: pointer;
+  }
+  .reset:hover {
+    color: var(--sl-color-white);
+    border-color: var(--sl-color-gray-4);
+  }
+  .output {
+    display: grid;
+    gap: 0.75rem;
+  }
+  .panel {
+    border: 1px solid var(--sl-color-gray-5);
+    border-radius: 0.75rem;
+    background: var(--sl-color-black);
+    overflow: hidden;
+  }
+  .panel-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.45rem 0.8rem;
+    border-bottom: 1px solid var(--sl-color-gray-5);
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--sl-color-gray-2);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .panel-head em {
+    font-style: normal;
+    font-weight: 400;
+    text-transform: none;
+    letter-spacing: 0;
+    font-family: var(--sl-font-mono);
+    color: var(--sl-color-gray-3);
+    margin-left: 0.4rem;
+  }
+  .panel pre {
+    margin: 0;
+    padding: 0.75rem 0.9rem;
+    max-height: 22rem;
+    overflow: auto;
+    font-family: var(--sl-font-mono);
+    font-size: 0.8rem;
+    line-height: 1.6;
+    color: var(--tok-text);
+  }
+  .copy {
+    padding: 0.12rem 0.5rem;
+    border: 1px solid var(--sl-color-gray-5);
+    border-radius: 0.4rem;
+    background: transparent;
+    color: var(--sl-color-gray-2);
+    font-size: 0.7rem;
+    text-transform: none;
+    letter-spacing: 0;
+    cursor: pointer;
+  }
+  .copy:hover {
+    color: var(--sl-color-white);
+  }
+  .speed {
+    font-family: var(--sl-font-mono);
+    text-transform: none;
+    letter-spacing: 0;
+    color: var(--raya-amber);
+  }
+  .bars {
+    display: grid;
+    grid-template-columns: repeat(15, 1fr);
+    gap: 0.3rem;
+    padding: 0.9rem 0.8rem 0.6rem;
+    transform-origin: center;
+  }
+  .spin .bars {
+    animation: pan var(--rot) ease-in-out infinite alternate;
+  }
+  @keyframes pan {
+    from {
+      transform: perspective(600px) rotateY(-14deg);
+    }
+    to {
+      transform: perspective(600px) rotateY(14deg);
+    }
+  }
+  .band {
+    display: grid;
+    gap: 0.3rem;
+    justify-items: center;
+  }
+  .band span {
+    font-size: 0.58rem;
+    color: var(--sl-color-gray-3);
+    font-family: var(--sl-font-mono);
+  }
+  .bar-wrap {
+    position: relative;
+    width: 100%;
+    height: 7rem;
+    border-radius: 0.35rem;
+    background: var(--sl-color-gray-6);
+    overflow: hidden;
+  }
+  .bar-wrap::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 20%;
+    border-top: 1px dashed var(--sl-color-gray-4);
+    opacity: 0.6;
+  }
+  .bar {
+    position: absolute;
+    inset: auto 0 0 0;
+    height: var(--h, 20%);
+    border-radius: 0.35rem 0.35rem 0 0;
+    background: var(--raya-gradient);
+    transition: height 0.45s cubic-bezier(0.34, 1.4, 0.64, 1);
+    animation: pulse calc(1.2s / var(--anim-speed)) ease-in-out infinite alternate;
+  }
+  .bar.neg {
+    background: linear-gradient(180deg, #7cc7ff, #6c7bff);
+  }
+  .band:nth-child(3n) .bar {
+    animation-delay: -0.4s;
+  }
+  .band:nth-child(3n + 1) .bar {
+    animation-delay: -0.8s;
+  }
+  @keyframes pulse {
+    to {
+      filter: brightness(1.25);
+      transform: scaleY(0.94);
+    }
+  }
+  .bar {
+    transform-origin: bottom;
+  }
+</style>

@@ -1,0 +1,110 @@
+---
+title: Quick start
+description: Build a working music bot with discord.js and Raya.
+---
+
+import { Steps, Aside } from '@astrojs/starlight/components';
+
+This guide builds a small discord.js bot with a `/play` command. For other libraries, see [connectors](../connectors/).
+
+<Steps>
+
+1. **Create the client and Raya.** Create the connector *before* `client.login()` so Raya sees every gateway event from the start.
+
+   ```js title="bot.js" {9-17}
+   const { Client, GatewayIntentBits } = require('discord.js');
+   const { Raya, Connectors } = require('raya.js');
+
+   const client = new Client({
+     intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates],
+   });
+
+   const raya = new Raya({
+     nodes: [
+       { name: 'main', host: 'localhost', port: 2333, password: 'youshallnotpass' },
+     ],
+     connector: new Connectors.DiscordJS(client),
+     defaultSearchSource: 'youtube', // or 'spsearch' with LavaSrc
+     playerDefaults: { autoplay: true },
+     voiceStatus: true,
+   });
+   ```
+
+2. **Listen to events.** Raya emits typed events for nodes, players, tracks and the queue.
+
+   ```js title="bot.js"
+   raya.on('nodeReady', (node) => console.log(`Lavalink node ${node.name} is ready`));
+
+   raya.on('trackStart', (player, track) => {
+     const channel = client.channels.cache.get(player.textChannelId);
+     channel?.send(`Now playing **${track.info.title}**`);
+   });
+
+   raya.on('queueEnd', (player) => {
+     client.channels.cache.get(player.textChannelId)?.send('Queue finished.');
+   });
+   ```
+
+3. **Handle the command.** `raya.join()` creates the player and waits until voice is connected. `enqueue()` adds the result and starts playing if the player is idle.
+
+   ```js title="bot.js"
+   client.on('interactionCreate', async (interaction) => {
+     if (!interaction.isChatInputCommand() || interaction.commandName !== 'play') return;
+
+     const voiceChannelId = interaction.member.voice.channelId;
+     if (!voiceChannelId) return interaction.reply('Join a voice channel first.');
+
+     await interaction.deferReply();
+     const player = await raya.join({
+       guildId: interaction.guildId,
+       voiceChannelId,
+       textChannelId: interaction.channelId,
+     });
+
+     const result = await player.search(interaction.options.getString('query'), {
+       requester: interaction.user,
+     });
+     if (result.tracks.length === 0) return interaction.editReply('Nothing found.');
+
+     const { added } = await player.enqueue(result);
+     await interaction.editReply(
+       result.type === 'playlist'
+         ? `Queued ${added.length} tracks from **${result.playlist.name}**`
+         : `Queued **${added[0].info.title}**`,
+     );
+   });
+
+   client.login(process.env.DISCORD_TOKEN);
+   ```
+
+4. **Run it.**
+
+   ```sh
+   node bot.js
+   ```
+
+</Steps>
+
+<Aside type="note">
+You don't need to call `raya.init()` or forward raw events yourself when you use a connector. It does both.
+</Aside>
+
+## Add the usual commands
+
+```js
+const player = raya.getPlayer(interaction.guildId);
+
+await player.skip();                 // next track
+await player.pause(!player.paused);  // toggle pause
+await player.setVolume(80);          // 0-1000, 100 = original loudness
+player.setLoop('queue');             // 'off' | 'track' | 'queue'
+player.queue.shuffle();
+await player.filters.bassBoost('high');
+await player.destroy();              // leave and clean up
+```
+
+## Keep going
+
+- Learn the [player](../../guides/players/) and [queue](../../guides/queue/) APIs.
+- Make restarts invisible with [snapshots](../../guides/restarts/).
+- Generate your full setup with the [Config Builder](../../tools/config-builder/).

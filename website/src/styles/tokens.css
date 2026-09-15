@@ -1,0 +1,27 @@
+/* Colors for code highlighted in the browser (see src/scripts/highlight.ts) */
+:root {
+  --tok-comment: #7d8398;
+  --tok-string: #ffb86b;
+  --tok-number: #ff8fb1;
+  --tok-keyword: #ff7a9c;
+  --tok-prop: #7cc7ff;
+  --tok-fn: #8fe3c7;
+  --tok-text: #e6e8f2;
+}
+
+:root[data-theme='light'] {
+  --tok-comment: #7a7f91;
+  --tok-string: #a0540b;
+  --tok-number: #b3246a;
+  --tok-keyword: #c2185b;
+  --tok-prop: #1f63b5;
+  --tok-fn: #0b7a5f;
+  --tok-text: #1d1f2b;
+}
+
+.tok-comment { color: var(--tok-comment); font-style: italic; }
+.tok-string { color: var(--tok-string); }
+.tok-number { color: var(--tok-number); }
+.tok-keyword { color: var(--tok-keyword); }
+.tok-prop { color: var(--tok-prop); }
+.tok-fn { color: var(--tok-fn); }

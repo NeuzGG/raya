@@ -1,0 +1,112 @@
+---
+title: Players
+description: Create players, join voice and control playback.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+A **player** belongs to one guild. It owns the queue, filters, loop mode and voice connection, and it lives on one Lavalink node.
+
+## Create and join
+
+```js
+// Create the player and wait until Lavalink has the voice connection
+const player = await raya.join({
+  guildId,
+  voiceChannelId,
+  textChannelId,   // optional, handy for "Now playing" messages
+  volume: 80,      // optional overrides of playerDefaults
+  selfDeaf: true,
+});
+```
+
+`raya.join()` is `raya.createPlayer()` plus `player.connect()`. If the voice connection doesn't arrive within `voiceTimeout` (15 seconds by default), it rejects with `VOICE_TIMEOUT` and cleans up the half-created player.
+
+```js
+const existing = raya.getPlayer(guildId);        // Player | undefined
+const player = raya.createPlayer({ guildId, voiceChannelId }); // returns the existing one if present
+await player.connect();
+```
+
+## Playback
+
+```js
+await player.play();                       // next track from the queue
+await player.play(track);                  // a specific track
+await player.play(track, { startTime: 30_000, endTime: 90_000 });
+await player.play(encodedString, { requester: user });
+
+await player.skip();          // resolves with the new track, or null when the queue ended
+await player.skip(3);         // skip three tracks
+await player.previous();      // back to the last played track
+await player.pause();         // pause(false) or resume() to continue
+await player.seek(60_000);    // clamped to the track length
+await player.replay();        // seek(0)
+await player.stop();          // stop, keep the queue
+await player.stop({ clearQueue: true });
+```
+
+`enqueue` is the easiest way to handle a search result. It adds the first search hit or every playlist track, and starts playing if nothing is playing:
+
+```js
+const result = await player.search('never gonna give you up', { requester: user });
+const { added, started } = await player.enqueue(result);
+```
+
+## Volume, loop and autoplay
+
+```js
+await player.setVolume(150);   // 0-1000, where 100 is the original loudness
+player.setLoop('track');       // 'off' | 'track' | 'queue'
+player.setAutoplay(true);      // see the Autoplay guide
+player.setTextChannel(channelId);
+```
+
+<Aside type="caution">
+Volume is **0 to 1000**, and 100 is unchanged. LavaFlow's `setVolume(100)` sent 1000, which is ten times too loud.
+</Aside>
+
+## State
+
+| Property | Description |
+| --- | --- |
+| `current` | The playing track, or `null` |
+| `position` | Live position in ms, interpolated between Lavalink updates |
+| `playing` / `paused` / `idle` | Playback state |
+| `volume`, `loop`, `autoplay` | Current settings |
+| `connected`, `ping` | Lavalink's voice connection to Discord |
+| `voiceChannelId`, `textChannelId` | Channels |
+| `node` | The Lavalink node the player lives on |
+| `queue`, `filters` | See [queue](../queue/) and [filters](../filters/) |
+| `data` | A `Map` for your own values; included in snapshots |
+
+```js
+player.data.set('djRole', roleId);
+const progress = `${player.position} / ${player.current?.info.length}`;
+```
+
+## Voice
+
+```js
+await player.moveTo(otherChannelId);  // move the bot
+await player.setSelfDeaf(false);
+await player.disconnect();            // leave voice but keep the player and queue
+```
+
+When the bot is kicked or its channel is deleted, the player is destroyed automatically. Set `playerDefaults.destroyOnVoiceDisconnect: false` to keep it instead.
+
+## Nodes
+
+```js
+await player.moveNode('backup');  // keeps track, position, filters, volume and queue
+player.node.name;
+```
+
+## Destroy
+
+```js
+await player.destroy();            // leave voice, stop audio, free it on Lavalink
+await raya.destroyPlayer(guildId); // same, by guild id
+```
+
+You can create a new player for the same guild right away: it waits until the old one has left before joining.

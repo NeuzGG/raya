@@ -1,0 +1,70 @@
+---
+title: Restarts without silence
+description: Restart your bot while the music keeps playing.
+---
+
+import { Steps, Aside } from '@astrojs/starlight/components';
+
+Lavalink plays the audio, not your bot. If Raya closes its connection the right way, Lavalink keeps every player going for `resumeTimeout` seconds (60 by default). The next process picks them up again.
+
+<Steps>
+
+1. **Before exiting**, take a snapshot. `shutdown()` waits for pending updates, saves every player, and closes node connections *without* destroying players.
+
+   ```js
+   const fs = require('node:fs');
+
+   async function shutdown() {
+     const snapshot = await raya.shutdown();
+     fs.writeFileSync('raya-snapshot.json', JSON.stringify(snapshot));
+     await client.destroy();
+     process.exit(0);
+   }
+
+   process.on('SIGINT', shutdown);
+   process.on('SIGTERM', shutdown);
+   ```
+
+2. **On start**, read the snapshot once and pass it as `restore`:
+
+   ```js
+   let restore;
+   if (fs.existsSync('raya-snapshot.json')) {
+     restore = JSON.parse(fs.readFileSync('raya-snapshot.json', 'utf8'));
+     fs.unlinkSync('raya-snapshot.json'); // snapshots are single use
+   }
+
+   const raya = new Raya({ nodes, connector, restore });
+   ```
+
+3. **That's it.** Raya reconnects with the saved session id. Lavalink reports the session as resumed, and every player is restored with its queue, requesters, loop mode, filters, volume and `player.data`.
+
+</Steps>
+
+```js
+raya.on('playerResume', (player) => console.log(`Restored ${player.guildId}`));
+```
+
+## What gets saved
+
+- Current track (with requester) and position
+- Queue and history
+- Volume, paused, loop, autoplay and filters
+- Voice and text channels, self deaf and mute
+- `player.data` entries
+- The Lavalink session id of each node
+
+<Aside type="caution" title="Keep snapshots serializable">
+Requesters are saved as they are. Use a [`requesterTransformer`](../typescript/#typed-requester) so they're small plain objects (for example `{ id, username }`), not full Discord library objects.
+</Aside>
+
+## If the restart takes too long
+
+If the session expired before the new process connected, Raya **rebuilds** each player from the snapshot instead. It rejoins the voice channel and starts the track at the saved position. You'll hear a short gap, but nothing is lost.
+
+## Crash protection
+
+`raya.snapshot()` returns the same data without closing anything. Save it every so often (for example on `queueUpdate`, throttled) so a crash loses at most a few seconds:
+
+- If the new process starts within `resumeTimeout`, the Lavalink session still resumes, and Raya takes the live track and position from Lavalink.
+- If not, players are rebuilt from the last snapshot.

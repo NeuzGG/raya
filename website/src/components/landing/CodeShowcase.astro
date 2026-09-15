@@ -1,0 +1,252 @@
+---
+import { Code } from 'astro:components';
+import { link } from '../../utils/links';
+
+const tabs = [
+  {
+    id: 'discordjs',
+    label: 'discord.js',
+    code: `const { Client, GatewayIntentBits } = require('discord.js');
+const { Raya, Connectors } = require('raya.js');
+
+const client = new Client({
+  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates],
+});
+
+const raya = new Raya({
+  nodes: [{ name: 'main', host: 'localhost', password: 'youshallnotpass' }],
+  connector: new Connectors.DiscordJS(client),
+});
+
+raya.on('trackStart', (player, track) => {
+  client.channels.cache.get(player.textChannelId)?.send(\`Now playing **\${track.info.title}**\`);
+});
+
+client.login(process.env.DISCORD_TOKEN);`,
+  },
+  {
+    id: 'eris',
+    label: 'Eris',
+    code: `const Eris = require('eris');
+const { Raya, Connectors } = require('raya.js');
+
+const client = new Eris(\`Bot \${process.env.DISCORD_TOKEN}\`, {
+  intents: ['guilds', 'guildVoiceStates'],
+});
+
+const raya = new Raya({
+  nodes: [{ name: 'main', host: 'localhost', password: 'youshallnotpass' }],
+  connector: new Connectors.Eris(client),
+});
+
+client.connect();`,
+  },
+  {
+    id: 'oceanic',
+    label: 'Oceanic',
+    code: `import { Client } from 'oceanic.js';
+import { Raya, Connectors } from 'raya.js';
+
+const client = new Client({
+  auth: \`Bot \${process.env.DISCORD_TOKEN}\`,
+  gateway: { intents: ['GUILDS', 'GUILD_VOICE_STATES'] },
+});
+
+const raya = new Raya({
+  nodes: [{ name: 'main', host: 'localhost', password: 'youshallnotpass' }],
+  connector: new Connectors.Oceanic(client),
+});
+
+client.connect();`,
+  },
+  {
+    id: 'play',
+    label: '/play command',
+    code: `const player = await raya.join({
+  guildId: interaction.guildId,
+  voiceChannelId: interaction.member.voice.channelId,
+  textChannelId: interaction.channelId,
+});
+
+const result = await player.search(query, { requester: interaction.user });
+const { added } = await player.enqueue(result); // starts playing when idle
+
+await interaction.reply(
+  result.type === 'playlist'
+    ? \`Queued \${added.length} tracks from \${result.playlist.name}\`
+    : \`Queued \${added[0].info.title}\`,
+);`,
+  },
+];
+---
+
+<section class="section" id="code">
+  <div class="container">
+    <header class="section-head" data-reveal>
+      <span class="eyebrow">Easy to start</span>
+      <h2>Up and running in <span class="gradient-text">a few lines</span></h2>
+      <p>Pick your Discord library. The connector handles raw gateway events, voice updates and startup for you.</p>
+    </header>
+
+    <div class="showcase panel" data-showcase data-reveal>
+      <div class="bar">
+        <div class="tabs" role="tablist" aria-label="Code examples">
+          {
+            tabs.map((tab, i) => (
+              <button type="button" role="tab" id={`tab-${tab.id}`} aria-controls={`panel-${tab.id}`} aria-selected={i === 0 ? 'true' : 'false'} tabindex={i === 0 ? 0 : -1}>
+                {tab.label}
+              </button>
+            ))
+          }
+          <span class="indicator" data-indicator aria-hidden="true"></span>
+        </div>
+        <button type="button" class="copy" data-copy>Copy</button>
+      </div>
+      {
+        tabs.map((tab, i) => (
+          <div class="code-panel" role="tabpanel" id={`panel-${tab.id}`} aria-labelledby={`tab-${tab.id}`} hidden={i !== 0} data-code={tab.code}>
+            <Code code={tab.code} lang={tab.id === 'oceanic' ? 'ts' : 'js'} themes={{ light: 'github-light-default', dark: 'github-dark-default' }} />
+          </div>
+        ))
+      }
+      <div class="foot">
+        <span>Want your exact setup?</span>
+        <a href={link('tools/config-builder/')}>Open the Config Builder →</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+  document.querySelectorAll<HTMLElement>('[data-showcase]').forEach((root) => {
+    const tabs = [...root.querySelectorAll<HTMLButtonElement>('[role="tab"]')];
+    const panels = [...root.querySelectorAll<HTMLElement>('[role="tabpanel"]')];
+    const indicator = root.querySelector<HTMLElement>('[data-indicator]')!;
+    let active = 0;
+
+    const moveIndicator = () => {
+      const tab = tabs[active]!;
+      indicator.style.width = `${tab.offsetWidth}px`;
+      indicator.style.transform = `translateX(${tab.offsetLeft}px)`;
+    };
+
+    const select = (index: number, focus = false) => {
+      active = index;
+      tabs.forEach((tab, i) => {
+        tab.setAttribute('aria-selected', String(i === index));
+        tab.tabIndex = i === index ? 0 : -1;
+      });
+      panels.forEach((panel, i) => {
+        panel.hidden = i !== index;
+        if (i === index) panel.animate([{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }], { duration: 280, easing: 'ease-out' });
+      });
+      if (focus) tabs[index]!.focus();
+      moveIndicator();
+    };
+
+    tabs.forEach((tab, i) => {
+      tab.addEventListener('click', () => select(i));
+      tab.addEventListener('keydown', (event) => {
+        if (event.key === 'ArrowRight') select((i + 1) % tabs.length, true);
+        if (event.key === 'ArrowLeft') select((i - 1 + tabs.length) % tabs.length, true);
+      });
+    });
+
+    const copy = root.querySelector<HTMLButtonElement>('[data-copy]')!;
+    copy.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(panels[active]!.dataset.code ?? '');
+        copy.textContent = 'Copied!';
+      } catch {
+        copy.textContent = 'Select to copy';
+      }
+      setTimeout(() => (copy.textContent = 'Copy'), 1500);
+    });
+
+    new ResizeObserver(moveIndicator).observe(root);
+    document.fonts?.ready.then(moveIndicator);
+    moveIndicator();
+  });
+</script>
+
+<style>
+  .showcase {
+    max-width: 880px;
+    margin: 0 auto;
+    overflow: hidden;
+  }
+  .bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem;
+    padding: 0.55rem 0.7rem;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface-2);
+  }
+  .tabs {
+    position: relative;
+    display: flex;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .tabs button {
+    position: relative;
+    z-index: 1;
+    padding: 0.45rem 0.85rem;
+    border: 0;
+    background: transparent;
+    color: var(--muted);
+    font-size: 0.86rem;
+    font-weight: 600;
+    white-space: nowrap;
+    transition: color 0.25s;
+  }
+  .tabs button[aria-selected='true'] {
+    color: var(--text);
+  }
+  .indicator {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    border-radius: 9px;
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
+    transition: transform 0.35s var(--ease-out), width 0.35s var(--ease-out);
+  }
+  .copy {
+    padding: 0.3rem 0.8rem;
+    border-radius: 8px;
+    border: 0;
+    background: var(--grad);
+    color: #fff;
+    font-size: 0.8rem;
+    font-weight: 600;
+    flex: none;
+  }
+  .code-panel {
+    padding: 1rem 1.2rem;
+    overflow-x: auto;
+  }
+  .code-panel :global(pre) {
+    margin: 0;
+    font-family: var(--mono);
+    font-size: 0.86rem;
+    line-height: 1.7;
+  }
+  .foot {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 0.4rem;
+    padding: 0.75rem 1.2rem;
+    border-top: 1px solid var(--border);
+    font-size: 0.9rem;
+    color: var(--muted);
+  }
+  .foot a {
+    font-weight: 600;
+    color: var(--coral);
+  }
+</style>

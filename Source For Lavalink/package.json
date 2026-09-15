@@ -1,0 +1,59 @@
+{
+  "name": "lavaflow",
+  "version": "3.1.0",
+  "description": "Professional-grade Lavalink v4 & Nodelink client library for Node.js with TypeScript-first design. Multi-backend support, advanced queue management, playback stats, caching, and recommendations.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "jest",
+    "lint": "eslint src --ext .ts",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "lavalink",
+    "lavalink-v4",
+    "nodelink",
+    "audio",
+    "music",
+    "discord",
+    "websocket",
+    "rest-api",
+    "queue-management",
+    "playback-stats",
+    "caching",
+    "recommendations"
+  ],
+  "author": "ryxu-xo <https://github.com/ryxu-xo>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ryxu-xo/lavaflow"
+  },
+  "bugs": {
+    "url": "https://github.com/ryxu-xo/lavaflow/issues"
+  },
+  "homepage": "https://github.com/ryxu-xo/lavaflow#readme",
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "dependencies": {
+    "discord.js": "^14.25.1",
+    "dotenv": "^17.3.1",
+    "ws": "^8.14.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@types/ws": "^8.5.9",
+    "@typescript-eslint/eslint-plugin": "^6.13.0",
+    "@typescript-eslint/parser": "^6.13.0",
+    "eslint": "^8.54.0",
+    "typescript": "^5.3.2"
+  }
+}

@@ -1,0 +1,77 @@
+---
+title: Autoplay
+description: Keep the music going with related tracks when the queue runs out.
+---
+
+import { Aside, Steps } from '@astrojs/starlight/components';
+
+When autoplay is on and the queue ends, Raya finds a related track and keeps playing.
+
+```js
+new Raya({ nodes, connector, playerDefaults: { autoplay: true } }); // every player
+player.setAutoplay(true);                                            // one player
+```
+
+<Aside type="caution" title="Put it in playerDefaults">
+A top-level `autoplay: true` (the LavaFlow style) is ignored. Raya prints a `RayaWarning` telling you to use `playerDefaults.autoplay`.
+</Aside>
+
+## How related tracks are found
+
+For the track that just finished, Raya tries these in order and plays the first result that wasn't played recently (matched by id or by title):
+
+<Steps>
+
+1. **The source's own recommendations**
+   - YouTube: the video's YouTube mix
+   - Spotify: `sprec:mix:track:<id>`, then `sprec:seed_tracks=<id>`
+   - Deezer, Yandex, VK, Tidal, Qobuz, JioSaavn: LavaSrc's `dzrec:`, `ymrec:`, `vkrec:`, `tdrec:`, `qbrec:`, `jsrec:`
+
+2. **A Spotify radio from the ISRC**, for tracks from other services, when your node has LavaSrc Spotify.
+
+3. **More from the same artist**: first on the same source, then on your `defaultSearchSource`, then on YouTube.
+
+</Steps>
+
+Queries for sources your Lavalink doesn't have are skipped, based on the node's `/v4/info`.
+
+<Aside type="note" title="Spotify without Extended quota">
+LavaSrc's Spotify recommendations only work in Extended quota mode or with anonymous tokens. Without them, step 1 fails and Raya falls back to more songs by the same artist on Spotify, so autoplay still works.
+</Aside>
+
+Autoplayed tracks inherit the requester of the track that finished. After three load failures in a row, autoplay stops trying and the queue ends, so a broken source can't cause an endless loop.
+
+## See what it's doing
+
+Turn on [debugging](../debugging/) to log every attempt:
+
+```
+[Raya] [Player 1234] autoplay "sprec:mix:track:0VjIjW4GlUZAMYd2vXMi3b" -> error (Recommendations need Extended quota mode)
+[Raya] [Player 1234] autoplay "spsearch:The Weeknd" -> search (10 tracks), picked "Save Your Tears"
+```
+
+## Custom autoplay
+
+Replace the strategy with your own. Return a track, or `null` to end the queue:
+
+```js
+new Raya({
+  nodes,
+  connector,
+  autoplayResolver: async (player, lastTrack) => {
+    const result = await player.search(`${lastTrack.info.author} live`, {
+      source: 'youtube',
+      requester: lastTrack.requester,
+    });
+    return result.tracks.find((t) => t.info.identifier !== lastTrack.info.identifier) ?? null;
+  },
+});
+```
+
+The built-in pieces are exported if you want to extend them:
+
+```js
+import { defaultAutoplay, relatedQueries } from 'raya.js';
+
+relatedQueries(player, track); // the candidate queries, best first
+```

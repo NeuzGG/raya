@@ -1,0 +1,89 @@
+---
+title: Player
+description: Every property and method of a Player.
+---
+
+Get players from `raya.join()`, `raya.createPlayer()` or `raya.getPlayer()`.
+
+## Properties
+
+| Property | Type | Description |
+| --- | --- | --- |
+| `guildId` | `string` | Guild id |
+| `node` | `Node` | Current Lavalink node |
+| `voiceChannelId` | `string \| null` | Voice channel |
+| `textChannelId` | `string \| null` | Text channel for your messages |
+| `current` | `Track \| null` | Playing track |
+| `position` | `number` | Live position in ms |
+| `playing` | `boolean` | A track is loaded and not paused |
+| `paused` | `boolean` | Paused |
+| `idle` | `boolean` | No track loaded |
+| `volume` | `number` | 0-1000 |
+| `loop` | `'off' \| 'track' \| 'queue'` | Loop mode |
+| `autoplay` | `boolean` | Autoplay enabled |
+| `selfDeaf` / `selfMute` | `boolean` | Voice flags |
+| `connected` | `boolean` | Lavalink is connected to Discord voice |
+| `ping` | `number` | Voice ping in ms, `-1` when unknown |
+| `queue` | `Queue` | See [Queue](../queue/) |
+| `filters` | `Filters` | See [Filters](../filters/) |
+| `data` | `Map<string, unknown>` | Your own values, saved in snapshots |
+| `voiceState` | `Partial<VoiceState>` | Known voice credentials |
+| `destroyed` | `boolean` | Destroyed |
+| `createdAt` | `number` | Creation timestamp |
+
+## Playback
+
+| Method | Returns | Description |
+| --- | --- | --- |
+| `play(track?, options?)` | `Promise<void>` | Play a track, an encoded string, or the next queued track |
+| `enqueue(input, { index? })` | `Promise<{ added, started }>` | Add a search result, track or tracks; start if idle |
+| `skip(amount = 1)` | `Promise<Track \| null>` | Skip; resolves with the new track |
+| `previous()` | `Promise<Track \| null>` | Play the last played track |
+| `stop({ clearQueue? })` | `Promise<void>` | Stop playback |
+| `pause(pause = true)` | `Promise<void>` | Pause or unpause |
+| `resume()` | `Promise<void>` | Same as `pause(false)` |
+| `seek(ms)` | `Promise<void>` | Seek, clamped to the track length |
+| `replay()` | `Promise<void>` | Restart the current track |
+| `setVolume(volume)` | `Promise<void>` | 0-1000 |
+| `setLoop(mode)` | `this` | `'off'`, `'track'` or `'queue'` |
+| `setAutoplay(enabled)` | `this` | Toggle autoplay |
+| `setTextChannel(id)` | `this` | Change the text channel |
+| `search(query, options?)` | `Promise<SearchResult>` | Search on this player's node |
+
+### Play options
+
+| Option | Type | Description |
+| --- | --- | --- |
+| `startTime` | `number` | Start position in ms |
+| `endTime` | `number` | Stop at this position in ms |
+| `paused` | `boolean` | Start paused (default `false`) |
+| `volume` | `number` | Set the volume at the same time |
+| `noReplace` | `boolean` | Do nothing if something is playing |
+| `requester` | `Requester` | Requester when playing an encoded string |
+| `addToHistory` | `boolean` | Push the replaced track to history (default `true`) |
+
+## Voice
+
+| Method | Returns | Description |
+| --- | --- | --- |
+| `connect({ channelId?, timeout? })` | `Promise<void>` | Join and wait for voice |
+| `moveTo(channelId, timeout?)` | `Promise<void>` | Move to another channel |
+| `disconnect()` | `Promise<void>` | Leave voice, keep the player |
+| `setSelfDeaf(deaf)` / `setSelfMute(mute)` | `Promise<void>` | Update voice flags |
+
+## Nodes and lifecycle
+
+| Method | Returns | Description |
+| --- | --- | --- |
+| `moveNode(node)` | `Promise<void>` | Move to another node without losing state |
+| `destroy({ reason?, disconnect? })` | `Promise<void>` | Destroy the player |
+| `toJSON()` | `PlayerSnapshot` | Serializable state |
+
+## Plugins
+
+| Method | Returns | Plugin |
+| --- | --- | --- |
+| `getLyrics(skipTrackSource?)` | `Promise<Lyrics \| null>` | LavaLyrics |
+| `subscribeLyrics(skipTrackSource?)` | `Promise<void>` | LavaLyrics |
+| `unsubscribeLyrics()` | `Promise<void>` | LavaLyrics |
+| `setSponsorBlock(categories)` | `Promise<void>` | SponsorBlock (`[]` to clear) |

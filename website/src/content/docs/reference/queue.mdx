@@ -1,0 +1,41 @@
+---
+title: Queue
+description: Every property and method of a player's Queue.
+---
+
+`player.queue` is iterable (`for (const track of player.queue)`). Every mutation emits `queueUpdate`.
+
+## Properties
+
+| Property | Type | Description |
+| --- | --- | --- |
+| `size` / `length` | `number` | Upcoming tracks |
+| `isEmpty` | `boolean` | No upcoming tracks |
+| `next` | `Track \| undefined` | The next track |
+| `duration` | `number` | Total ms of non-stream tracks |
+| `history` | `readonly Track[]` | Played tracks, most recent last |
+| `previous` | `Track \| undefined` | Most recently played track |
+| `maxSize` | `number` | Capacity |
+| `historySize` | `number` | History capacity |
+
+## Methods
+
+| Method | Returns | Description |
+| --- | --- | --- |
+| `add(tracks, index?)` | `number` | Add one or many; returns how many were added. Throws `QUEUE_FULL` when nothing fits |
+| `addNext(tracks)` | `number` | Add to the front |
+| `remove(index)` | `Track \| undefined` | Remove one |
+| `removeRange(start, end)` | `Track[]` | Remove `[start, end)` |
+| `removeWhere(predicate)` | `Track[]` | Remove every match |
+| `move(from, to)` | `boolean` | Move a track |
+| `swap(a, b)` | `boolean` | Swap two tracks |
+| `shuffle()` | `void` | Fisher-Yates shuffle |
+| `dedupe()` | `number` | Remove duplicates; returns how many |
+| `clear()` | `void` | Remove all upcoming tracks |
+| `clearHistory()` | `void` | Forget played tracks |
+| `shift()` | `Track \| undefined` | Take the next track off the queue |
+| `at(index)` | `Track \| undefined` | Supports negative indexes |
+| `slice(start?, end?)` | `Track[]` | Copy of a range |
+| `find(predicate)` | `Track \| undefined` | First match |
+| `indexOf(track)` | `number` | Index or `-1` |
+| `toArray()` | `Track[]` | Copy of all upcoming tracks |

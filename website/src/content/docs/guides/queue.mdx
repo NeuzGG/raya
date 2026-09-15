@@ -1,0 +1,80 @@
+---
+title: Queue
+description: Add, reorder and remove tracks, and use play history.
+---
+
+Every player has a `queue` of upcoming tracks and a bounded **history** of played ones. Every change emits `queueUpdate`.
+
+## Adding
+
+```js
+player.queue.add(track);           // returns how many were added
+player.queue.add([a, b, c]);
+player.queue.add(track, 2);        // insert at index 2
+player.queue.addNext(track);       // play next
+await player.enqueue(result);      // add and start playing if idle
+```
+
+The queue holds up to `playerDefaults.maxQueueSize` tracks (10,000 by default). Extra tracks are dropped. Adding to a full queue throws `QUEUE_FULL`.
+
+## Reordering and removing
+
+```js
+player.queue.move(5, 0);       // move track 5 to the front
+player.queue.swap(1, 2);
+player.queue.shuffle();
+player.queue.remove(3);        // returns the removed track
+player.queue.removeRange(0, 5);
+player.queue.removeWhere((t) => t.requester?.id === userId); // remove everything from one user
+player.queue.dedupe();         // remove duplicates, keep the first
+player.queue.clear();
+```
+
+Methods that take an index return `false` or `undefined` for out-of-range values instead of throwing, so they're safe to call with user input.
+
+## Reading
+
+```js
+player.queue.size;             // number of upcoming tracks
+player.queue.isEmpty;
+player.queue.next;             // the next track
+player.queue.duration;         // total ms, streams excluded
+player.queue.at(-1);           // last track
+player.queue.slice(0, 10);     // first page
+player.queue.find((t) => t.info.title.includes('remix'));
+
+for (const track of player.queue) {
+  // the queue is iterable
+}
+```
+
+## History
+
+```js
+player.queue.history;          // played tracks, most recent last
+player.queue.previous;         // the last played track
+await player.previous();       // play it again; the current track returns to the front
+player.queue.clearHistory();
+```
+
+History keeps the last `playerDefaults.historySize` tracks (50 by default). Tracks that failed to load aren't added.
+
+## Loop modes
+
+| Mode | When a track finishes |
+| --- | --- |
+| `'off'` | Play the next track, or end the queue |
+| `'track'` | Play the same track again |
+| `'queue'` | Move the finished track to the back of the queue |
+
+`skip()` always moves on, even in `'track'` mode.
+
+## Pagination example
+
+```js
+const page = 0;
+const perPage = 10;
+const lines = player.queue
+  .slice(page * perPage, (page + 1) * perPage)
+  .map((t, i) => `${page * perPage + i + 1}. ${t.info.title}`);
+```

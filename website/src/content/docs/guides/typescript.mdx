@@ -1,0 +1,89 @@
+---
+title: TypeScript
+description: Typed events, a typed requester and stable error codes.
+---
+
+Raya is written in TypeScript and ships its own declarations. Events, options and results are fully typed.
+
+## Typed events
+
+```ts
+raya.on('trackStart', (player, track) => {
+  // player: Player, track: Track
+});
+
+raya.on('nodeDisconnect', (node, { code, reason, wasReady }) => {});
+raya.on('playerDestroy', (player, reason) => {
+  // reason: 'manual' | 'queueEnd' | 'channelEmpty' | 'voiceDisconnected' | ...
+});
+```
+
+## Typed requester
+
+By default `track.requester` is `unknown`. Tell Raya what you store with declaration merging:
+
+```ts title="src/raya.d.ts"
+import 'raya.js';
+
+declare module 'raya.js' {
+  interface CustomTypes {
+    requester: { id: string; username: string; avatar: string | null };
+  }
+}
+```
+
+Then store exactly that shape with `requesterTransformer`, which runs on everything you pass as `requester`:
+
+```ts
+import { Raya, Connectors } from 'raya.js';
+import type { User } from 'discord.js';
+
+const raya = new Raya({
+  nodes,
+  connector: new Connectors.DiscordJS(client),
+  requesterTransformer: (user) => {
+    const u = user as User;
+    return { id: u.id, username: u.username, avatar: u.avatar };
+  },
+});
+
+raya.on('trackStart', (player, track) => {
+  track.requester?.username; // string | undefined
+});
+```
+
+This also keeps [snapshots](../restarts/) small and serializable.
+
+## Errors
+
+Every error Raya throws is a `RayaError` with a stable `code`, so you can check `code` instead of matching message text:
+
+```ts
+import { RayaError, RestError } from 'raya.js';
+
+try {
+  await player.play();
+} catch (error) {
+  if (error instanceof RayaError) {
+    switch (error.code) {
+      case 'NO_TRACK':         return reply('The queue is empty.');
+      case 'NODE_NOT_READY':   return reply('Music is reconnecting, try again in a moment.');
+      case 'PLAYER_DESTROYED': return reply('The player was stopped.');
+    }
+  }
+  if (error instanceof RestError) console.error(error.status, error.body);
+  throw error;
+}
+```
+
+See all [error codes](../../reference/errors/).
+
+## Useful types
+
+```ts
+import type {
+  Track, SearchResult, LoopMode, RayaOptions, PlayerDefaults, NodeOptions,
+  RayaEvents, RayaSnapshot, Connector, RayaPlugin, AutoplayResolver,
+  FilterOptions, LavalinkTrack, NodeStats, Lyrics,
+} from 'raya.js';
+```

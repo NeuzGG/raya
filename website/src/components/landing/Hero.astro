@@ -1,0 +1,765 @@
+---
+import { highlight } from '../../scripts/highlight';
+import { link } from '../../utils/links';
+
+const snippet = `import { Raya, Connectors } from 'raya.js';
+
+const raya = new Raya({
+  nodes: [{ host: 'localhost', password: 'youshallnotpass' }],
+  connector: new Connectors.DiscordJS(client),
+  playerDefaults: { autoplay: true },
+  voiceStatus: true,
+});
+
+const player = await raya.join({ guildId, voiceChannelId });
+await player.enqueue(await player.search('neon tide'));`;
+---
+
+<section class="hero" id="main">
+  <div class="backdrop" aria-hidden="true">
+    <div class="orb orb-a"></div>
+    <div class="orb orb-b"></div>
+    <div class="orb orb-c"></div>
+    <div class="grid"></div>
+  </div>
+
+  <div class="container inner">
+    <div class="hero-copy">
+      <a class="pill enter" href={link('guides/voice-status/')}>
+        <span class="pill-dot"></span>
+        New: voice channel status
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3l5 5-5 5" /></svg>
+      </a>
+      <h1 class="enter" style="--delay: 0.08s">
+        Music that<br /><span class="gradient-text">never stops.</span>
+      </h1>
+      <p class="lead enter" style="--delay: 0.16s">
+        Raya is the Lavalink v4 client for Node.js that survives bot restarts, dead nodes and network blips, and still
+        fits in a few lines of code.
+      </p>
+      <div class="cta enter" style="--delay: 0.24s">
+        <a class="btn btn-primary" href={link('getting-started/quick-start/')}>
+          Get started
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 8h10M9 4l4 4-4 4" /></svg>
+        </a>
+        <a class="btn btn-ghost" href="#demo">Try the live demo</a>
+      </div>
+
+      <div class="install enter" data-install style="--delay: 0.32s">
+        <div class="tabs" role="tablist" aria-label="Package manager">
+          {['npm', 'pnpm', 'yarn', 'bun'].map((pm, i) => (
+            <button type="button" role="tab" aria-selected={i === 0 ? 'true' : 'false'} data-pm={pm}>{pm}</button>
+          ))}
+        </div>
+        <div class="cmd">
+          <span class="prompt" aria-hidden="true">$</span>
+          <code data-cmd>npm install raya.js</code>
+          <button type="button" class="copy" data-copy aria-label="Copy install command">
+            <svg class="i-copy" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15V6a2 2 0 0 1 2-2h9" /></svg>
+            <svg class="i-check" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10" /></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="visual enter" style="--delay: 0.2s">
+      <div class="window panel" data-typer>
+        <div class="window-head">
+          <span class="window-dots"><i></i><i></i><i></i></span>
+          <span class="file">bot.js</span>
+          <span class="status"><span class="live"></span>connected</span>
+        </div>
+        <pre class="code"><code data-code set:html={highlight(snippet)} /><span class="caret" aria-hidden="true"></span></pre>
+      </div>
+
+      <div class="toasts" aria-hidden="true">
+        <div class="toast" data-toast>
+          <span class="toast-icon" data-toast-icon>⚡</span>
+          <div>
+            <strong data-toast-title>trackStart</strong>
+            <span data-toast-text>Neon Tide · Lumen Coast</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="float-card" aria-hidden="true">
+        <div class="art"></div>
+        <div class="meta">
+          <strong>Neon Tide</strong>
+          <span>Lumen Coast</span>
+          <div class="mini-progress"><i></i></div>
+        </div>
+        <div class="eq"><i></i><i></i><i></i><i></i></div>
+      </div>
+    </div>
+  </div>
+
+  <canvas class="visualizer" data-visualizer aria-hidden="true"></canvas>
+</section>
+
+<script>
+  // Install command switcher + copy
+  const install = document.querySelector<HTMLElement>('[data-install]');
+  if (install) {
+    const commands: Record<string, string> = {
+      npm: 'npm install raya.js',
+      pnpm: 'pnpm add raya.js',
+      yarn: 'yarn add raya.js',
+      bun: 'bun add raya.js',
+    };
+    const cmd = install.querySelector<HTMLElement>('[data-cmd]')!;
+    install.querySelectorAll<HTMLButtonElement>('[data-pm]').forEach((tab) =>
+      tab.addEventListener('click', () => {
+        install.querySelectorAll('[data-pm]').forEach((t) => t.setAttribute('aria-selected', String(t === tab)));
+        cmd.textContent = commands[tab.dataset.pm!]!;
+        cmd.animate([{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }], { duration: 250, easing: 'ease-out' });
+      }),
+    );
+    const copy = install.querySelector<HTMLButtonElement>('[data-copy]')!;
+    copy.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(cmd.textContent ?? '');
+      } catch {
+        /* clipboard unavailable */
+      }
+      copy.classList.add('done');
+      setTimeout(() => copy.classList.remove('done'), 1600);
+    });
+  }
+
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // Typewriter: reveal the pre-highlighted code character by character
+  const typer = document.querySelector<HTMLElement>('[data-typer]');
+  const toastEl = document.querySelector<HTMLElement>('[data-toast]');
+  function startToasts() {
+    if (!toastEl) return;
+    const toasts = [
+      ['⚡', 'trackStart', 'Neon Tide · Lumen Coast'],
+      ['🎶', 'voice status', 'Now playing: Neon Tide'],
+      ['🔁', 'nodeReady', 'main · resumed: true'],
+      ['✨', 'autoplay', 'picked "Glass Harbor"'],
+      ['🛟', 'playerNodeMove', 'tokyo → frankfurt'],
+    ];
+    let i = 0;
+    const show = () => {
+      const [icon, title, text] = toasts[i++ % toasts.length]!;
+      toastEl.querySelector('[data-toast-icon]')!.textContent = icon!;
+      toastEl.querySelector('[data-toast-title]')!.textContent = title!;
+      toastEl.querySelector('[data-toast-text]')!.textContent = text!;
+      toastEl.classList.remove('show');
+      void toastEl.offsetWidth;
+      toastEl.classList.add('show');
+    };
+    show();
+    setInterval(show, 3200);
+  }
+
+  if (typer) {
+    const code = typer.querySelector<HTMLElement>('[data-code]')!;
+    const walker = document.createTreeWalker(code, NodeFilter.SHOW_TEXT);
+    const nodes: { node: Text; text: string }[] = [];
+    while (walker.nextNode()) {
+      const node = walker.currentNode as Text;
+      nodes.push({ node, text: node.data });
+    }
+    if (reduceMotion) {
+      typer.classList.add('typed');
+      startToasts();
+    } else {
+      nodes.forEach((n) => (n.node.data = ''));
+      let nodeIndex = 0;
+      let charIndex = 0;
+      const type = () => {
+        let budget = 2;
+        while (budget-- > 0 && nodeIndex < nodes.length) {
+          const current = nodes[nodeIndex]!;
+          charIndex++;
+          current.node.data = current.text.slice(0, charIndex);
+          if (charIndex >= current.text.length) {
+            nodeIndex++;
+            charIndex = 0;
+          }
+        }
+        if (nodeIndex < nodes.length) {
+          setTimeout(type, 18 + Math.random() * 22);
+        } else {
+          typer.classList.add('typed');
+          setTimeout(startToasts, 400);
+        }
+      };
+      setTimeout(type, 700);
+    }
+  }
+
+  // Audio visualizer that reacts to the pointer
+  const canvas = document.querySelector<HTMLCanvasElement>('[data-visualizer]');
+  if (canvas) {
+    const ctx = canvas.getContext('2d')!;
+    let width = 0;
+    let height = 0;
+    let pointerX = -1;
+    let visible = true;
+    let frame = 0;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+    const resize = () => {
+      width = canvas.clientWidth;
+      height = canvas.clientHeight;
+      canvas.width = width * dpr;
+      canvas.height = height * dpr;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    };
+    resize();
+    new ResizeObserver(resize).observe(canvas);
+
+    const hero = canvas.closest('section')!;
+    hero.addEventListener('pointermove', (event) => {
+      const rect = canvas.getBoundingClientRect();
+      pointerX = event.clientX - rect.left;
+    });
+    hero.addEventListener('pointerleave', () => (pointerX = -1));
+
+    let running = false;
+    new IntersectionObserver(([entry]) => {
+      visible = entry!.isIntersecting;
+      if (visible && !running && !reduceMotion) {
+        running = true;
+        frame = requestAnimationFrame(draw);
+      }
+    }).observe(canvas);
+
+    const styles = getComputedStyle(document.documentElement);
+    const draw = (time: number) => {
+      ctx.clearRect(0, 0, width, height);
+      const gap = 4;
+      const barWidth = width < 640 ? 5 : 7;
+      const count = Math.floor(width / (barWidth + gap));
+      const t = time / 1000;
+      const gradient = ctx.createLinearGradient(0, 0, width, 0);
+      gradient.addColorStop(0, styles.getPropertyValue('--rose').trim() || '#ff4d8d');
+      gradient.addColorStop(0.5, styles.getPropertyValue('--coral').trim() || '#ff7a45');
+      gradient.addColorStop(1, styles.getPropertyValue('--amber').trim() || '#ffb547');
+      ctx.fillStyle = gradient;
+      for (let i = 0; i < count; i++) {
+        const x = i * (barWidth + gap);
+        const wave =
+          0.55 * Math.sin(i * 0.18 + t * 2.1) +
+          0.3 * Math.sin(i * 0.05 - t * 1.3) +
+          0.15 * Math.sin(i * 0.9 + t * 5.3);
+        let level = 0.18 + 0.32 * (wave * 0.5 + 0.5);
+        if (pointerX >= 0) level += 0.55 * Math.exp(-((x - pointerX) ** 2) / (2 * 90 ** 2));
+        const h = Math.max(3, Math.min(1, level) * height);
+        ctx.globalAlpha = 0.25 + 0.55 * Math.min(1, level);
+        ctx.beginPath();
+        ctx.roundRect(x, height - h, barWidth, h, [barWidth / 2, barWidth / 2, 0, 0]);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+      if (visible && !reduceMotion) frame = requestAnimationFrame(draw);
+      else running = false;
+    };
+    if (reduceMotion) draw(0);
+    void frame;
+  }
+</script>
+
+<style>
+  .hero {
+    position: relative;
+    padding: clamp(40px, 7vw, 90px) 0 170px;
+    overflow: hidden;
+  }
+  .backdrop {
+    position: absolute;
+    inset: -20% -10% 0;
+    pointer-events: none;
+    z-index: 0;
+  }
+  .orb {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(80px);
+    opacity: 0.55;
+    animation: drift 18s ease-in-out infinite alternate;
+  }
+  .orb-a {
+    width: 520px;
+    height: 520px;
+    left: -6%;
+    top: 4%;
+    background: radial-gradient(circle, rgba(255, 77, 141, 0.55), transparent 65%);
+  }
+  .orb-b {
+    width: 600px;
+    height: 600px;
+    right: -8%;
+    top: -6%;
+    background: radial-gradient(circle, rgba(255, 150, 70, 0.45), transparent 65%);
+    animation-duration: 22s;
+    animation-delay: -6s;
+  }
+  .orb-c {
+    width: 420px;
+    height: 420px;
+    left: 38%;
+    bottom: 2%;
+    background: radial-gradient(circle, rgba(124, 178, 255, 0.28), transparent 65%);
+    animation-duration: 26s;
+  }
+  :global(:root[data-theme='light']) .orb {
+    opacity: 0.35;
+  }
+  @keyframes drift {
+    to {
+      transform: translate3d(60px, 40px, 0) scale(1.08);
+    }
+  }
+  .grid {
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(var(--border) 1px, transparent 1px),
+      linear-gradient(90deg, var(--border) 1px, transparent 1px);
+    background-size: 56px 56px;
+    mask-image: radial-gradient(ellipse 70% 55% at 50% 40%, #000 30%, transparent 75%);
+    -webkit-mask-image: radial-gradient(ellipse 70% 55% at 50% 40%, #000 30%, transparent 75%);
+  }
+  .inner {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+    gap: clamp(32px, 5vw, 64px);
+    align-items: center;
+  }
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0.35rem 0.8rem 0.35rem 0.55rem;
+    border-radius: 999px;
+    border: 1px solid var(--border-strong);
+    background: color-mix(in srgb, var(--surface) 70%, transparent);
+    backdrop-filter: blur(10px);
+    font-size: 0.85rem;
+    color: var(--muted);
+    transition: border-color 0.25s, color 0.25s;
+  }
+  .pill:hover {
+    color: var(--text);
+    border-color: color-mix(in srgb, var(--coral) 55%, var(--border-strong));
+  }
+  .pill svg {
+    width: 12px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+  }
+  .pill-dot {
+    position: relative;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--mint);
+  }
+  .pill-dot::after {
+    content: '';
+    position: absolute;
+    inset: -4px;
+    border-radius: 50%;
+    border: 2px solid var(--mint);
+    animation: ping 1.8s ease-out infinite;
+  }
+  @keyframes ping {
+    from {
+      transform: scale(0.5);
+      opacity: 0.9;
+    }
+    to {
+      transform: scale(1.6);
+      opacity: 0;
+    }
+  }
+  h1 {
+    margin: 1.1rem 0 1rem;
+    font-family: var(--display);
+    font-size: clamp(2.8rem, 7.2vw, 5.4rem);
+    line-height: 0.95;
+    letter-spacing: -0.045em;
+    font-weight: 800;
+  }
+  h1 .gradient-text {
+    background-size: 200% auto;
+    animation: shimmer 6s linear infinite;
+  }
+  @keyframes shimmer {
+    to {
+      background-position: 200% center;
+    }
+  }
+  .lead {
+    max-width: 34rem;
+    margin: 0 0 1.75rem;
+    color: var(--muted);
+    font-size: clamp(1.05rem, 1.7vw, 1.2rem);
+  }
+  .cta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.7rem;
+  }
+  .install {
+    margin-top: 1.75rem;
+    max-width: 26rem;
+  }
+  .tabs {
+    display: inline-flex;
+    gap: 0.15rem;
+    margin-bottom: 0.45rem;
+  }
+  .tabs button {
+    padding: 0.2rem 0.6rem;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--faint);
+    font-size: 0.78rem;
+    font-family: var(--mono);
+    transition: color 0.2s, background 0.2s;
+  }
+  .tabs button:hover {
+    color: var(--text);
+  }
+  .tabs button[aria-selected='true'] {
+    color: var(--text);
+    background: var(--surface-2);
+  }
+  .cmd {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    padding: 0.5rem 0.5rem 0.5rem 1rem;
+    border-radius: 14px;
+    border: 1px solid var(--border-strong);
+    background: color-mix(in srgb, var(--surface) 80%, transparent);
+    backdrop-filter: blur(10px);
+    font-family: var(--mono);
+  }
+  .prompt {
+    color: var(--coral);
+  }
+  .cmd code {
+    flex: 1;
+    font-size: 0.95rem;
+  }
+  .copy {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--muted);
+    transition: color 0.2s, border-color 0.2s, transform 0.2s;
+  }
+  .copy:hover {
+    color: var(--text);
+    border-color: var(--border-strong);
+  }
+  .copy:active {
+    transform: scale(0.92);
+  }
+  .copy svg {
+    grid-area: 1 / 1;
+    width: 17px;
+    height: 17px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    transition: transform 0.3s var(--ease-spring), opacity 0.2s;
+  }
+  .i-check {
+    opacity: 0;
+    transform: scale(0.4);
+    color: var(--mint);
+  }
+  .copy.done .i-copy {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  .copy.done .i-check {
+    opacity: 1;
+    transform: none;
+  }
+  .visual {
+    position: relative;
+    min-width: 0;
+  }
+  .window {
+    position: relative;
+    overflow: hidden;
+    transform: perspective(1400px) rotateY(-6deg) rotateX(3deg);
+    transition: transform 0.8s var(--ease-out);
+  }
+  .visual:hover .window {
+    transform: perspective(1400px) rotateY(0) rotateX(0);
+  }
+  .window::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    padding: 1px;
+    border-radius: inherit;
+    background: linear-gradient(140deg, rgba(255, 122, 69, 0.55), transparent 40%, transparent 70%, rgba(255, 77, 141, 0.45));
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+  .window-head {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .file {
+    font-family: var(--mono);
+    font-size: 0.82rem;
+    color: var(--muted);
+  }
+  .status {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.75rem;
+    color: var(--mint);
+  }
+  .live {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--mint);
+    box-shadow: 0 0 0 0 var(--mint);
+    animation: live 1.8s infinite;
+  }
+  @keyframes live {
+    70% {
+      box-shadow: 0 0 0 7px transparent;
+    }
+  }
+  .code {
+    margin: 0;
+    padding: 1.1rem 1.2rem 1.4rem;
+    min-height: 19.5rem;
+    overflow-x: auto;
+    font-family: var(--mono);
+    font-size: clamp(0.72rem, 1.05vw, 0.84rem);
+    line-height: 1.7;
+    color: var(--tok-text);
+  }
+  .caret {
+    display: inline-block;
+    width: 8px;
+    height: 1.1em;
+    margin-left: 1px;
+    vertical-align: text-bottom;
+    background: var(--coral);
+    animation: blink 1s steps(1) infinite;
+  }
+  @keyframes blink {
+    50% {
+      opacity: 0;
+    }
+  }
+  .toasts {
+    position: absolute;
+    right: -14px;
+    bottom: -26px;
+    z-index: 2;
+  }
+  .toast {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    padding: 0.65rem 0.95rem 0.65rem 0.7rem;
+    border-radius: 14px;
+    border: 1px solid var(--border-strong);
+    background: color-mix(in srgb, var(--surface) 88%, transparent);
+    backdrop-filter: blur(12px);
+    box-shadow: var(--shadow-lg);
+    opacity: 0;
+    min-width: 220px;
+  }
+  .toast.show {
+    animation: toast 3.2s var(--ease-out) forwards;
+  }
+  @keyframes toast {
+    0% {
+      opacity: 0;
+      transform: translateY(14px) scale(0.96);
+    }
+    12%,
+    85% {
+      opacity: 1;
+      transform: none;
+    }
+    100% {
+      opacity: 0;
+      transform: translateY(-8px);
+    }
+  }
+  .toast-icon {
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    background: var(--grad-soft);
+    font-size: 1rem;
+  }
+  .toast strong {
+    display: block;
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    color: var(--coral);
+  }
+  .toast span {
+    font-size: 0.85rem;
+    color: var(--muted);
+  }
+  .float-card {
+    position: absolute;
+    left: -34px;
+    top: -30px;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    padding: 0.6rem 0.8rem 0.6rem 0.6rem;
+    border-radius: 16px;
+    border: 1px solid var(--border-strong);
+    background: color-mix(in srgb, var(--surface) 88%, transparent);
+    backdrop-filter: blur(12px);
+    box-shadow: var(--shadow-lg);
+    animation: float 6s ease-in-out infinite;
+  }
+  @keyframes float {
+    50% {
+      transform: translateY(-10px);
+    }
+  }
+  .float-card .art {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #ff4d8d, #ffb547);
+  }
+  .float-card .meta {
+    display: grid;
+    line-height: 1.25;
+  }
+  .float-card strong {
+    font-size: 0.85rem;
+  }
+  .float-card span {
+    font-size: 0.75rem;
+    color: var(--muted);
+  }
+  .mini-progress {
+    width: 110px;
+    height: 3px;
+    margin-top: 0.35rem;
+    border-radius: 3px;
+    background: var(--surface-3);
+    overflow: hidden;
+  }
+  .mini-progress i {
+    display: block;
+    height: 100%;
+    background: var(--grad);
+    animation: progress 9s linear infinite;
+  }
+  @keyframes progress {
+    from {
+      width: 0;
+    }
+    to {
+      width: 100%;
+    }
+  }
+  .eq {
+    display: flex;
+    align-items: flex-end;
+    gap: 3px;
+    height: 20px;
+    margin-left: 0.3rem;
+  }
+  .eq i {
+    width: 3px;
+    height: 100%;
+    border-radius: 2px;
+    background: var(--coral);
+    transform-origin: bottom;
+    animation: eq 0.9s ease-in-out infinite alternate;
+  }
+  .eq i:nth-child(2) {
+    animation-delay: -0.3s;
+  }
+  .eq i:nth-child(3) {
+    animation-delay: -0.6s;
+  }
+  .eq i:nth-child(4) {
+    animation-delay: -0.15s;
+  }
+  @keyframes eq {
+    from {
+      transform: scaleY(0.25);
+    }
+  }
+  .visualizer {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: 130px;
+    z-index: 0;
+    mask-image: linear-gradient(to top, #000, transparent);
+    -webkit-mask-image: linear-gradient(to top, #000 20%, transparent);
+  }
+  @media (max-width: 960px) {
+    .inner {
+      grid-template-columns: 1fr;
+    }
+    .window {
+      transform: none;
+    }
+    .float-card {
+      left: auto;
+      right: 8px;
+      top: -36px;
+    }
+    .toasts {
+      right: 8px;
+    }
+  }
+  @media (max-width: 520px) {
+    .float-card {
+      display: none;
+    }
+    .toasts {
+      left: 8px;
+      right: 8px;
+    }
+    .toast {
+      min-width: 0;
+    }
+  }
+</style>

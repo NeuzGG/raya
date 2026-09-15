@@ -1,0 +1,23 @@
+---
+title: Events
+description: Every event Raya emits and its arguments.
+---
+
+import { LinkCard } from '@astrojs/starlight/components';
+import EventTable from '../../../components/EventTable.astro';
+
+`Raya` is a typed `EventEmitter`: listener arguments are checked by TypeScript.
+
+```js
+raya.on('trackStart', (player, track) => {});
+raya.once('ready', () => {});
+raya.off('trackStart', listener);
+```
+
+<LinkCard
+  title="Event Explorer"
+  description="Search events and copy example listeners."
+  href="../../tools/event-explorer/"
+/>
+
+<EventTable />

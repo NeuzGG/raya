@@ -1,0 +1,42 @@
+---
+title: Errors
+description: Every error code Raya uses.
+---
+
+Raya throws `RayaError` with a stable `code`. REST failures throw `RestError`, a subclass with `status`, `method`, `path` and the parsed Lavalink error `body`.
+
+```ts
+import { RayaError, RestError } from 'raya.js';
+
+if (error instanceof RayaError && error.code === 'NO_NODES') { /* ... */ }
+```
+
+| Code | When |
+| --- | --- |
+| `NOT_INITIALIZED` | Something needed `raya.init()` first |
+| `ALREADY_INITIALIZED` | Reserved |
+| `INVALID_ARGUMENT` | Bad input, e.g. a negative skip amount, an unknown loop mode or an invalid filter value |
+| `NO_NODES` | No Lavalink node is ready |
+| `NODE_NOT_FOUND` | No node with that name |
+| `NODE_NOT_READY` | The node has no ready session |
+| `NODE_AUTH_FAILED` | Lavalink rejected the password |
+| `NODE_EXISTS` | A node with that name already exists |
+| `REST_ERROR` | Lavalink answered with an error status (`RestError`) |
+| `REST_TIMEOUT` | A REST request timed out |
+| `NETWORK_ERROR` | A connection or request failed |
+| `PLAYER_DESTROYED` | The player was destroyed |
+| `NO_TRACK` | Nothing to play or seek |
+| `QUEUE_FULL` | The queue is at `maxQueueSize` |
+| `VOICE_TIMEOUT` | Voice credentials didn't arrive in time |
+| `DECODE_FAILED` | An encoded track is malformed |
+| `DISCORD_API_ERROR` | Discord rejected a voice channel status update |
+
+## Background errors
+
+Errors that don't come from a call you made are emitted instead of thrown:
+
+```js
+raya.on('nodeError', (node, error) => {});     // connection problems, auth failures
+raya.on('playerError', (player, error) => {}); // failed auto-advance, voice forwarding, autoplay
+raya.on('trackError', (player, track, exception) => {}); // Lavalink couldn't play a track
+```

@@ -1,0 +1,56 @@
+---
+title: Introduction
+description: What Raya is and why it exists.
+---
+
+import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+**Raya** is a Lavalink **v4** client for Node.js, written in TypeScript. It connects your Discord bot to one or more [Lavalink](https://lavalink.dev) servers (or [NodeLink](https://github.com/PerformanC/NodeLink), or anything else that speaks the v4 protocol) and gives you players, queues, filters and events that are pleasant to use.
+
+It's built around one idea: **the music should never stop**. Network blips, Lavalink restarts, dead nodes and even restarting your own bot should all be invisible to the people listening.
+
+```js
+const player = await raya.join({ guildId, voiceChannelId, textChannelId });
+await player.enqueue(await player.search('lofi hip hop', { requester: user }));
+```
+
+## Highlights
+
+<CardGrid>
+  <Card title="Restart-proof" icon="rocket">
+    `raya.shutdown()` saves every player. The next process resumes the same Lavalink session, so the
+    music keeps playing through a bot restart.
+  </Card>
+  <Card title="Self-healing" icon="random">
+    v4 session resuming, rebuilds after a Lavalink restart, automatic failover between nodes, and voice
+    reconnects after Discord voice errors.
+  </Card>
+  <Card title="Fast by design" icon="star">
+    Updates made in the same tick are merged into one request. Tracks decode locally, searches are cached
+    and de-duplicated, and balancing is load-aware.
+  </Card>
+  <Card title="Easy and complete" icon="puzzle">
+    Connectors for discord.js, Eris and Oceanic. Queue, loop, autoplay, filters, auto-leave, voice channel
+    status, lyrics, SponsorBlock and fully typed events.
+  </Card>
+</CardGrid>
+
+## At a glance
+
+| | |
+| --- | --- |
+| Protocol | Lavalink v4 only |
+| Runtime | Node.js 18.17+ |
+| Dependencies | 1 (`ws`) |
+| Module formats | CommonJS and ESM, with TypeScript declarations |
+| Discord libraries | discord.js, Eris, Oceanic, or any library via `send` |
+| License | MIT |
+
+## Where to next
+
+<CardGrid>
+  <LinkCard title="Installation" description="Requirements and install commands." href="../installation/" />
+  <LinkCard title="Quick start" description="A working music bot in a few minutes." href="../quick-start/" />
+  <LinkCard title="Config Builder" description="Click options, copy ready-to-use code." href="../../tools/config-builder/" />
+  <LinkCard title="Migrating from LavaFlow" description="What changed and what got fixed." href="../../guides/migrating-from-lavaflow/" />
+</CardGrid>

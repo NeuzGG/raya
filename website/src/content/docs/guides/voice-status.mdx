@@ -1,0 +1,77 @@
+---
+title: Voice channel status
+description: Show the playing track as the Discord voice channel status.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+Discord voice channels can show a status line. Raya sets it to the current track, updates it on every track change, follows the bot when it moves, and clears it when playback ends.
+
+```js
+new Raya({
+  nodes,
+  connector,
+  voiceStatus: { template: '🎶 {title} - {author} [{duration}]' },
+});
+```
+
+`voiceStatus: true` uses the default template, `Now playing: {title}`.
+
+## Templates
+
+| Placeholder | Example |
+| --- | --- |
+| `{title}` | `Blinding Lights` |
+| `{author}` | `The Weeknd` |
+| `{duration}` | `3:20`, `1:02:03` or `LIVE` |
+| `{requester}` | the requester's display name, username or id |
+| `{source}` | `spotify` |
+| `{uri}` | the track URL |
+| `{identifier}` | the source's track id |
+
+Unknown placeholders are left as they are. For full control, pass a function:
+
+```js
+voiceStatus: {
+  template: (track, player) => `${player.loop === 'track' ? '🔂' : '▶'} ${track.info.title}`,
+}
+```
+
+## Options
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `template` | `'Now playing: {title}'` | String with placeholders, or a function |
+| `token` | from the connector | Bot token; only needed with a custom `send` |
+| `clearOnEnd` | `true` | Clear on queue end, `stop()` and `destroy()` |
+| `reason` | none | Audit log reason |
+| `apiBase` | `https://discord.com/api/v10` | Discord API base URL |
+| `onError` | none | `(error, channelId) => void` |
+
+## Manual control
+
+```js
+await raya.voiceStatus?.set(channelId, 'Taking requests! Use /play');
+await raya.voiceStatus?.clear(channelId);
+```
+
+Or add it as a plugin to keep a reference:
+
+```js
+import { VoiceStatus } from 'raya.js';
+
+const status = new VoiceStatus({ template: '{title}' });
+await raya.use(status);
+```
+
+## How it behaves
+
+- **Permission:** the bot needs **Set Voice Channel Status** in the channel.
+- **Clears before leaving:** on `destroy()`, the status is cleared while the bot is still in the channel. That wait is capped at 1.5 seconds, so a slow API never delays leaving.
+- **Fast skips:** when tracks change faster than Discord answers, only the newest text is sent, and unchanged text is never re-sent.
+- **Limits:** rate limits (429) are retried, and text is cut to Discord's 500-character limit.
+- **Safe:** failures never affect playback. They go to `onError` and the debug log.
+
+<Aside type="tip">
+Missing permissions show up as `DISCORD_API_ERROR` with Discord's message (for example `Missing Permissions`) in `onError`.
+</Aside>

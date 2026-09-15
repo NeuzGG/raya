@@ -1,0 +1,435 @@
+---
+import { link } from '../../utils/links';
+---
+
+<section class="section" id="resilience">
+  <div class="container">
+    <header class="section-head" data-reveal>
+      <span class="eyebrow">Resilience simulator</span>
+      <h2>Break things. <span class="gradient-text">The music keeps going.</span></h2>
+      <p>
+        Each dot is a guild's player. Crash a Lavalink node, cut its network, or restart your bot, and watch what Raya
+        does, with the same events your code gets.
+      </p>
+    </header>
+
+    <div class="sim panel" data-failover-demo data-reveal>
+      <div class="toolbar">
+        <button type="button" class="tool" data-add>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+          Add player
+        </button>
+        <button type="button" class="tool primary" data-restart>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 0 1 13.6-5.7L20 8.5M20 4v4.5h-4.5M20 12a8 8 0 0 1-13.6 5.7L4 15.5M4 20v-4.5h4.5" /></svg>
+          Restart the bot
+        </button>
+        <button type="button" class="tool ghost" data-reset>Reset</button>
+        <a class="docs-link" href={link('guides/resilience/')}>How it works →</a>
+      </div>
+
+      <div class="body">
+        <div class="stage">
+          <div class="nodes" data-nodes></div>
+          <div class="orphans" data-orphans hidden>
+            <span>Waiting for a ready node</span>
+          </div>
+          <div class="overlay" data-overlay hidden>
+            <div class="overlay-card">
+              <div class="spinner" aria-hidden="true"></div>
+              <strong>Bot process restarting…</strong>
+              <span>Lavalink keeps every player going for resumeTimeout seconds</span>
+            </div>
+          </div>
+        </div>
+        <div class="log-panel">
+          <div class="log-head">Events</div>
+          <div class="log" data-log role="log" aria-live="polite"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+  import { mountFailoverDemo } from '../../scripts/failover-demo';
+  document.querySelectorAll<HTMLElement>('[data-failover-demo]').forEach(mountFailoverDemo);
+</script>
+
+<style>
+  .sim {
+    overflow: hidden;
+  }
+  .toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.85rem 1rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .tool {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    height: 38px;
+    padding: 0 0.9rem;
+    border-radius: 999px;
+    border: 1px solid var(--border-strong);
+    background: var(--surface-2);
+    font-size: 0.88rem;
+    font-weight: 600;
+    transition: transform 0.2s var(--ease-out), border-color 0.2s;
+  }
+  .tool:hover {
+    transform: translateY(-1px);
+    border-color: color-mix(in srgb, var(--coral) 50%, var(--border-strong));
+  }
+  .tool svg {
+    width: 16px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+  }
+  .tool.primary {
+    border-color: transparent;
+    background: var(--grad);
+    color: #fff;
+    box-shadow: var(--glow);
+  }
+  .tool.ghost {
+    background: transparent;
+  }
+  .docs-link {
+    margin-left: auto;
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--coral);
+  }
+  .body {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 300px;
+  }
+  .stage {
+    position: relative;
+    padding: 1rem;
+    display: grid;
+    gap: 0.8rem;
+    align-content: start;
+  }
+  .nodes {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.8rem;
+  }
+  .nodes :global(.node) {
+    --state: var(--mint);
+    display: flex;
+    flex-direction: column;
+    gap: 0.7rem;
+    padding: 0.9rem;
+    border-radius: 14px;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    transition: border-color 0.4s, background 0.4s, transform 0.4s var(--ease-out);
+  }
+  .nodes :global(.node[data-status='reconnecting']) {
+    --state: var(--amber);
+    border-color: color-mix(in srgb, var(--amber) 45%, transparent);
+    animation: shake 0.5s ease-in-out;
+  }
+  .nodes :global(.node[data-status='down']) {
+    --state: var(--red);
+    border-color: color-mix(in srgb, var(--red) 50%, transparent);
+    background: color-mix(in srgb, var(--red) 6%, var(--surface-2));
+  }
+  @keyframes shake {
+    25% {
+      transform: translateX(-4px);
+    }
+    75% {
+      transform: translateX(4px);
+    }
+  }
+  .nodes :global(.node-head) {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .nodes :global(.light) {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--state);
+    box-shadow: 0 0 12px var(--state);
+  }
+  .nodes :global(.node[data-status='reconnecting'] .light) {
+    animation: blink 0.7s steps(2) infinite;
+  }
+  @keyframes blink {
+    50% {
+      opacity: 0.2;
+    }
+  }
+  .nodes :global(.node-head strong) {
+    font-family: var(--mono);
+    font-size: 0.9rem;
+  }
+  .nodes :global(.status) {
+    margin-left: auto;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--state);
+  }
+  .nodes :global(.penalty) {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.68rem;
+    color: var(--faint);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .nodes :global(.meter) {
+    height: 5px;
+    border-radius: 5px;
+    background: var(--surface-3);
+    overflow: hidden;
+  }
+  .nodes :global(.meter i) {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--state);
+    transition: width 0.5s var(--ease-out), background 0.4s;
+  }
+  .nodes :global(.penalty b) {
+    font-family: var(--mono);
+    color: var(--muted);
+    min-width: 1.2rem;
+    text-align: right;
+  }
+  .nodes :global(.slots),
+  .orphans {
+    display: flex;
+    flex-wrap: wrap;
+    align-content: flex-start;
+    gap: 8px;
+    min-height: 92px;
+    padding: 0.6rem;
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--bg) 45%, transparent);
+    border: 1px dashed var(--border);
+  }
+  :global(.player-dot) {
+    --h: 20;
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, hsl(var(--h) 95% 72%), hsl(var(--h) 85% 48%));
+    box-shadow: 0 4px 12px -4px hsl(var(--h) 90% 50%);
+  }
+  :global(.player-dot i) {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.85);
+    animation: beat 1.1s ease-in-out infinite;
+  }
+  @keyframes beat {
+    50% {
+      transform: scale(0.55);
+      opacity: 0.6;
+    }
+  }
+  .nodes :global(.node[data-status='down'] .player-dot) {
+    filter: grayscale(0.7);
+  }
+  .nodes :global(.node-foot) {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.4rem;
+    font-size: 0.75rem;
+    color: var(--faint);
+  }
+  .nodes :global(.node-actions) {
+    display: inline-flex;
+    gap: 0.3rem;
+  }
+  .nodes :global(.node-actions button) {
+    padding: 0.2rem 0.55rem;
+    border-radius: 999px;
+    border: 1px solid var(--border-strong);
+    background: transparent;
+    color: var(--muted);
+    font-size: 0.72rem;
+    font-weight: 600;
+    transition: color 0.2s, border-color 0.2s, background 0.2s;
+  }
+  .nodes :global(.node-actions button:hover:not(:disabled)) {
+    color: var(--text);
+  }
+  .nodes :global(.node-actions button:disabled) {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+  .nodes :global(.node-actions .danger:hover:not(:disabled)) {
+    color: var(--red);
+    border-color: color-mix(in srgb, var(--red) 55%, transparent);
+    background: color-mix(in srgb, var(--red) 10%, transparent);
+  }
+  .nodes :global(.node-actions .ok) {
+    color: var(--mint);
+    border-color: color-mix(in srgb, var(--mint) 55%, transparent);
+  }
+  .orphans {
+    position: relative;
+    min-height: 60px;
+    border-color: color-mix(in srgb, var(--amber) 45%, transparent);
+    padding-top: 1.6rem;
+  }
+  .orphans > span {
+    position: absolute;
+    top: 0.4rem;
+    left: 0.6rem;
+    font-size: 0.7rem;
+    color: var(--amber);
+    font-weight: 600;
+  }
+  .restarting .nodes :global(.player-dot) {
+    opacity: 0.35;
+    filter: saturate(0.4);
+    transition: opacity 0.4s, filter 0.4s;
+  }
+  .overlay {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    background: color-mix(in srgb, var(--bg) 35%, transparent);
+    backdrop-filter: blur(2px);
+    animation: fade 0.3s ease-out;
+  }
+  @keyframes fade {
+    from {
+      opacity: 0;
+    }
+  }
+  .overlay-card {
+    display: grid;
+    justify-items: center;
+    gap: 0.35rem;
+    padding: 1.2rem 1.5rem;
+    border-radius: 16px;
+    border: 1px solid var(--border-strong);
+    background: var(--surface);
+    box-shadow: var(--shadow-lg);
+    text-align: center;
+  }
+  .overlay-card span {
+    font-size: 0.82rem;
+    color: var(--muted);
+  }
+  .spinner {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 3px solid var(--surface-3);
+    border-top-color: var(--coral);
+    animation: rotate 0.8s linear infinite;
+  }
+  @keyframes rotate {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  .log-panel {
+    display: flex;
+    flex-direction: column;
+    border-left: 1px solid var(--border);
+    background: color-mix(in srgb, var(--bg) 60%, var(--surface));
+    min-height: 0;
+  }
+  .log-head {
+    padding: 0.7rem 0.9rem;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .log {
+    flex: 1;
+    height: 340px;
+    overflow-y: auto;
+    padding: 0.5rem 0.6rem;
+    font-family: var(--mono);
+    font-size: 0.72rem;
+  }
+  .log :global(.log-row) {
+    display: grid;
+    grid-template-columns: 2.6rem 1fr;
+    gap: 0 0.4rem;
+    padding: 0.3rem 0.35rem;
+    border-radius: 6px;
+    animation: row-in 0.4s var(--ease-out);
+  }
+  @keyframes row-in {
+    from {
+      opacity: 0;
+      transform: translateY(-6px);
+      background: color-mix(in srgb, var(--coral) 12%, transparent);
+    }
+  }
+  .log :global(.t) {
+    grid-row: span 2;
+    color: var(--faint);
+  }
+  .log :global(.e) {
+    color: var(--mint);
+    font-weight: 600;
+  }
+  .log :global(.warn .e) {
+    color: var(--amber);
+  }
+  .log :global(.d) {
+    grid-column: 2;
+    color: var(--muted);
+  }
+  .log :global(.c) {
+    color: var(--coral);
+    grid-row: span 2;
+  }
+  .log :global(.note .e) {
+    color: var(--faint);
+    font-style: italic;
+    font-weight: 400;
+  }
+  @media (max-width: 1000px) {
+    .body {
+      grid-template-columns: 1fr;
+    }
+    .log-panel {
+      border-left: 0;
+      border-top: 1px solid var(--border);
+    }
+    .log {
+      height: 220px;
+    }
+  }
+  @media (max-width: 700px) {
+    .nodes {
+      grid-template-columns: 1fr;
+    }
+    .docs-link {
+      margin-left: 0;
+    }
+  }
+</style>

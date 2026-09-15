@@ -1,0 +1,858 @@
+---
+import { link } from '../../utils/links';
+---
+
+<section class="section demo-section" id="demo">
+  <div class="container">
+    <header class="section-head" data-reveal>
+      <span class="eyebrow">Live demo</span>
+      <h2>Play with a <span class="gradient-text">Raya player</span></h2>
+      <p>
+        A simulated player that follows Raya's real queue rules. Each click shows the method you'd call, the request Raya
+        sends, and the events your bot receives.
+      </p>
+    </header>
+
+    <div class="demo is-idle" data-player-demo data-reveal>
+      <div class="card player">
+        <div class="np">
+          <div class="art" data-art>
+            <span data-art-initials>♪</span>
+          </div>
+          <div class="np-meta" aria-live="polite">
+            <span class="np-label" data-np-label>Idle</span>
+            <h3 data-title>Nothing playing</h3>
+            <p data-author>Add a track from the search box</p>
+            <div class="np-tags">
+              <span class="src" data-source></span>
+              <span class="req" data-requester></span>
+            </div>
+          </div>
+        </div>
+
+        <canvas class="viz" data-viz aria-hidden="true"></canvas>
+
+        <div class="progress" data-progress role="slider" tabindex="0" aria-label="Seek" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+          <div class="fill" data-fill></div>
+        </div>
+        <div class="times">
+          <span data-pos>0:00</span>
+          <span class="speed">20× demo speed</span>
+          <span data-len>0:00</span>
+        </div>
+
+        <div class="controls">
+          <button type="button" class="ctl" data-action="shuffle" aria-label="Shuffle queue">
+            <svg viewBox="0 0 24 24"><path d="M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5" /></svg>
+          </button>
+          <button type="button" class="ctl" data-action="previous" aria-label="Previous track">
+            <svg viewBox="0 0 24 24"><path d="M19 20 9 12l10-8v16ZM5 19V5" /></svg>
+          </button>
+          <button type="button" class="ctl play" data-action="toggle" aria-label="Play">
+            <svg class="i-play" viewBox="0 0 24 24"><path d="M7 4.5v15l13-7.5-13-7.5Z" /></svg>
+            <svg class="i-pause" viewBox="0 0 24 24"><path d="M7 4h3.5v16H7zM13.5 4H17v16h-3.5z" /></svg>
+          </button>
+          <button type="button" class="ctl" data-action="skip" aria-label="Skip">
+            <svg viewBox="0 0 24 24"><path d="m5 4 10 8-10 8V4ZM19 5v14" /></svg>
+          </button>
+          <button type="button" class="ctl loop" data-action="loop" data-loop="off" aria-label="Loop: off">
+            <svg viewBox="0 0 24 24"><path d="M17 1l4 4-4 4M3 11V9a4 4 0 0 1 4-4h14M7 23l-4-4 4-4M21 13v2a4 4 0 0 1-4 4H3" /></svg>
+            <span class="loop-badge" aria-hidden="true"></span>
+          </button>
+        </div>
+
+        <div class="row">
+          <label class="volume">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4V5Zm4.5 3.5a5 5 0 0 1 0 7" /></svg>
+            <span class="sr-only">Volume</span>
+            <input type="range" min="0" max="200" step="5" value="100" data-volume />
+            <output data-volume-out>100</output>
+          </label>
+          <button type="button" class="pill-toggle" data-action="autoplay" aria-pressed="false">
+            <span class="dot"></span>Autoplay
+          </button>
+        </div>
+
+        <div class="filters" role="group" aria-label="Filters">
+          <button type="button" data-filter="nightcore" aria-pressed="false">Nightcore</button>
+          <button type="button" data-filter="vaporwave" aria-pressed="false">Vaporwave</button>
+          <button type="button" data-filter="bassBoost" aria-pressed="false">Bass boost</button>
+          <button type="button" data-filter="eightD" aria-pressed="false">8D</button>
+        </div>
+      </div>
+
+      <div class="card queue-card">
+        <label class="search">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10.5 3a7.5 7.5 0 0 1 5.96 12.06l4.24 4.24-1.4 1.4-4.24-4.24A7.5 7.5 0 1 1 10.5 3Zm0 2a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11Z" /></svg>
+          <input type="search" placeholder="Search the demo catalog" aria-label="Search tracks" data-search autocomplete="off" />
+        </label>
+        <ul class="results" data-results></ul>
+
+        <div class="queue-head">
+          <span>Up next</span>
+          <span data-queue-count>0 tracks</span>
+        </div>
+        <ol class="queue" data-queue></ol>
+        <p class="queue-empty" data-queue-empty hidden>The queue is empty. With autoplay on, Raya keeps going anyway.</p>
+      </div>
+
+      <div class="card console-card">
+        <div class="console-head">
+          <span class="window-dots"><i></i><i></i><i></i></span>
+          <span>What your bot sees</span>
+          <button type="button" data-clear>Clear</button>
+        </div>
+        <div class="console" data-console role="log" aria-label="Raya calls and events"></div>
+        <div class="legend">
+          <span><i class="k-call"></i>your call</span>
+          <span><i class="k-http"></i>request to Lavalink</span>
+          <span><i class="k-event"></i>event</span>
+          <a href={link('tools/event-explorer/')}>All events →</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+  import { mountPlayerDemo } from '../../scripts/player-demo';
+  document.querySelectorAll<HTMLElement>('[data-player-demo]').forEach(mountPlayerDemo);
+</script>
+
+<style>
+  .demo-section {
+    background: radial-gradient(ellipse 60% 50% at 50% 0%, color-mix(in srgb, var(--coral) 8%, transparent), transparent 70%);
+  }
+  .demo {
+    --speed: 1;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.15fr);
+    gap: 14px;
+    align-items: stretch;
+  }
+  .card {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    box-shadow: var(--shadow-lg);
+    min-width: 0;
+  }
+  /* ---------- Player ---------- */
+  .player {
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+    padding: 1.2rem;
+  }
+  .np {
+    display: flex;
+    gap: 0.9rem;
+    align-items: center;
+  }
+  .art {
+    --h: 230;
+    position: relative;
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 84px;
+    height: 84px;
+    border-radius: 18px;
+    background: linear-gradient(135deg, hsl(var(--h) 90% 62%), hsl(calc(var(--h) + 45) 85% 45%));
+    color: #fff;
+    font-family: var(--display);
+    font-weight: 800;
+    font-size: 1.6rem;
+    box-shadow: 0 16px 34px -14px hsl(var(--h) 90% 55%);
+    transition: background 0.6s, box-shadow 0.6s, transform 0.5s var(--ease-spring);
+    overflow: hidden;
+  }
+  .art::after {
+    content: '';
+    position: absolute;
+    inset: -40%;
+    background: conic-gradient(from 0deg, transparent, rgba(255, 255, 255, 0.35), transparent 30%);
+    opacity: 0;
+    transition: opacity 0.4s;
+  }
+  .is-playing .art::after {
+    opacity: 1;
+    animation: spin calc(4s / var(--speed)) linear infinite;
+  }
+  .is-playing .art {
+    transform: scale(1.03);
+  }
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  .np-meta {
+    min-width: 0;
+  }
+  .np-label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--coral);
+  }
+  .np-meta h3 {
+    margin: 0.1rem 0 0;
+    font-family: var(--display);
+    font-size: 1.3rem;
+    letter-spacing: -0.02em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .np-meta p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.9rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .np-tags {
+    display: flex;
+    gap: 0.35rem;
+    margin-top: 0.35rem;
+    min-height: 1.3rem;
+  }
+  .src,
+  :global(.demo .src) {
+    padding: 0.05rem 0.45rem;
+    border-radius: 999px;
+    font-size: 0.68rem;
+    font-weight: 600;
+    text-transform: capitalize;
+  }
+  :global(.demo .src-spotify) {
+    color: #1ed760;
+    background: rgba(30, 215, 96, 0.12);
+  }
+  :global(.demo .src-youtube) {
+    color: #ff5a5a;
+    background: rgba(255, 90, 90, 0.12);
+  }
+  :global(.demo .src-soundcloud) {
+    color: #ff8a3d;
+    background: rgba(255, 138, 61, 0.12);
+  }
+  :global(.demo .src-none) {
+    display: none;
+  }
+  .req {
+    font-size: 0.72rem;
+    color: var(--faint);
+  }
+  .viz {
+    width: 100%;
+    height: 64px;
+  }
+  .eight-d .viz {
+    animation: pan 1.8s ease-in-out infinite alternate;
+  }
+  @keyframes pan {
+    from {
+      transform: perspective(500px) rotateY(-12deg);
+    }
+    to {
+      transform: perspective(500px) rotateY(12deg);
+    }
+  }
+  .progress {
+    position: relative;
+    height: 6px;
+    border-radius: 6px;
+    background: var(--surface-3);
+    cursor: pointer;
+    transition: height 0.2s;
+  }
+  .progress:hover,
+  .progress:focus-visible {
+    height: 9px;
+  }
+  .fill {
+    position: absolute;
+    inset: 0 auto 0 0;
+    border-radius: inherit;
+    background: var(--grad);
+  }
+  .fill::after {
+    content: '';
+    position: absolute;
+    right: -6px;
+    top: 50%;
+    width: 13px;
+    height: 13px;
+    border-radius: 50%;
+    background: #fff;
+    transform: translateY(-50%) scale(0);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+    transition: transform 0.2s var(--ease-spring);
+  }
+  .progress:hover .fill::after {
+    transform: translateY(-50%) scale(1);
+  }
+  .times {
+    display: flex;
+    justify-content: space-between;
+    margin-top: -0.4rem;
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: var(--faint);
+    font-variant-numeric: tabular-nums;
+  }
+  .speed {
+    color: var(--amber);
+    font-family: var(--body);
+    font-size: 0.7rem;
+  }
+  .controls {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+  }
+  .ctl {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--text);
+    transition: transform 0.2s var(--ease-spring), background 0.2s, border-color 0.2s;
+  }
+  .ctl:hover {
+    transform: translateY(-2px);
+    border-color: var(--border-strong);
+  }
+  .ctl:active {
+    transform: scale(0.9);
+  }
+  .ctl svg {
+    width: 18px;
+    height: 18px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .ctl.play {
+    width: 56px;
+    height: 56px;
+    border: 0;
+    background: var(--grad);
+    color: #fff;
+    box-shadow: var(--glow);
+  }
+  .ctl.play svg {
+    grid-area: 1 / 1;
+    width: 22px;
+    height: 22px;
+    fill: currentColor;
+    stroke: none;
+    transition: transform 0.3s var(--ease-spring), opacity 0.2s;
+  }
+  .i-pause {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  .is-playing .i-play {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  .is-playing .i-pause {
+    opacity: 1;
+    transform: none;
+  }
+  .loop[data-loop='queue'],
+  .loop[data-loop='track'] {
+    color: var(--coral);
+    border-color: color-mix(in srgb, var(--coral) 45%, transparent);
+    background: color-mix(in srgb, var(--coral) 12%, var(--surface-2));
+  }
+  .loop-badge {
+    position: absolute;
+    right: -2px;
+    bottom: -2px;
+    display: grid;
+    place-items: center;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 3px;
+    border-radius: 999px;
+    background: var(--coral);
+    color: #fff;
+    font-size: 0.6rem;
+    font-weight: 700;
+    transform: scale(0);
+    transition: transform 0.25s var(--ease-spring);
+  }
+  .loop[data-loop='queue'] .loop-badge,
+  .loop[data-loop='track'] .loop-badge {
+    transform: scale(1);
+  }
+  .loop[data-loop='queue'] .loop-badge::after {
+    content: 'Q';
+  }
+  .loop[data-loop='track'] .loop-badge::after {
+    content: '1';
+  }
+  .row {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+  }
+  .volume {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    color: var(--muted);
+    min-width: 0;
+  }
+  .volume svg {
+    width: 18px;
+    height: 18px;
+    flex: none;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+  }
+  .volume input {
+    flex: 1;
+    min-width: 0;
+    accent-color: var(--coral);
+  }
+  .volume output {
+    width: 2.2rem;
+    text-align: right;
+    font-family: var(--mono);
+    font-size: 0.78rem;
+  }
+  .pill-toggle,
+  .filters button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.35rem 0.75rem;
+    border-radius: 999px;
+    border: 1px solid var(--border-strong);
+    background: transparent;
+    color: var(--muted);
+    font-size: 0.82rem;
+    font-weight: 500;
+    transition: all 0.25s var(--ease-out);
+  }
+  .pill-toggle:hover,
+  .filters button:hover {
+    color: var(--text);
+    transform: translateY(-1px);
+  }
+  .pill-toggle .dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--faint);
+    transition: background 0.2s, box-shadow 0.2s;
+  }
+  .pill-toggle[aria-pressed='true'] {
+    color: var(--mint);
+    border-color: color-mix(in srgb, var(--mint) 50%, transparent);
+    background: color-mix(in srgb, var(--mint) 10%, transparent);
+  }
+  .pill-toggle[aria-pressed='true'] .dot {
+    background: var(--mint);
+    box-shadow: 0 0 10px var(--mint);
+  }
+  .filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+  .filters button[aria-pressed='true'] {
+    color: #fff;
+    border-color: transparent;
+    background: var(--grad);
+    box-shadow: 0 8px 20px -10px var(--coral);
+  }
+  /* ---------- Queue ---------- */
+  .queue-card {
+    display: flex;
+    flex-direction: column;
+    padding: 1rem;
+    max-height: 640px;
+  }
+  .search {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.55rem 0.75rem;
+    border-radius: 12px;
+    border: 1px solid var(--border-strong);
+    background: var(--surface-2);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .search:focus-within {
+    border-color: var(--coral);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--coral) 20%, transparent);
+  }
+  .search svg {
+    width: 17px;
+    fill: var(--faint);
+    flex: none;
+  }
+  .search input {
+    flex: 1;
+    min-width: 0;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    font-size: 0.9rem;
+  }
+  .results {
+    list-style: none;
+    margin: 0.5rem 0 0;
+    padding: 0;
+    display: grid;
+    gap: 2px;
+  }
+  .results :global(button) {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    width: 100%;
+    padding: 0.4rem 0.5rem;
+    border: 0;
+    border-radius: 10px;
+    background: transparent;
+    text-align: left;
+    transition: background 0.2s, transform 0.2s;
+  }
+  .results :global(button:hover) {
+    background: var(--surface-2);
+  }
+  .results :global(button.added) {
+    animation: added 0.7s var(--ease-out);
+  }
+  @keyframes added {
+    30% {
+      background: color-mix(in srgb, var(--mint) 20%, transparent);
+      transform: scale(0.98);
+    }
+  }
+  .results :global(.plus) {
+    display: grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    margin-left: auto;
+    border-radius: 50%;
+    border: 1px solid var(--border-strong);
+    color: var(--muted);
+    transition: background 0.2s, color 0.2s, transform 0.3s var(--ease-spring);
+  }
+  .results :global(button:hover .plus) {
+    background: var(--grad);
+    color: #fff;
+    border-color: transparent;
+    transform: rotate(90deg);
+  }
+  .results :global(.no-results) {
+    padding: 0.6rem;
+    color: var(--faint);
+    font-size: 0.85rem;
+  }
+  :global(.demo .thumb) {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
+    background: linear-gradient(135deg, hsl(var(--h) 85% 62%), hsl(calc(var(--h) + 45) 80% 45%));
+    color: #fff;
+    font-size: 0.72rem;
+    font-weight: 800;
+    font-family: var(--display);
+  }
+  :global(.demo .r-meta),
+  :global(.demo .q-meta) {
+    display: grid;
+    min-width: 0;
+    line-height: 1.3;
+  }
+  :global(.demo .r-meta strong),
+  :global(.demo .q-meta strong) {
+    font-size: 0.86rem;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  :global(.demo .r-meta span),
+  :global(.demo .q-meta span) {
+    font-size: 0.75rem;
+    color: var(--faint);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .queue-head {
+    display: flex;
+    justify-content: space-between;
+    margin: 0.9rem 0 0.4rem;
+    padding-top: 0.8rem;
+    border-top: 1px solid var(--border);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .queue-head span:last-child {
+    font-weight: 500;
+    letter-spacing: 0;
+    text-transform: none;
+    font-family: var(--mono);
+    color: var(--faint);
+  }
+  .queue {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 4px;
+    overflow-y: auto;
+    min-height: 0;
+  }
+  .queue :global(li) {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.35rem 0.4rem;
+    border-radius: 11px;
+    border: 1px solid transparent;
+    background: var(--surface-2);
+    transition: transform 0.25s var(--ease-out), box-shadow 0.25s, border-color 0.2s;
+  }
+  .queue :global(li.fresh) {
+    animation: fresh 0.6s var(--ease-out);
+  }
+  @keyframes fresh {
+    from {
+      opacity: 0;
+      transform: translateX(16px);
+      border-color: var(--mint);
+    }
+  }
+  .queue :global(li.dragging) {
+    position: relative;
+    z-index: 2;
+    transition: none;
+    border-color: var(--coral);
+    box-shadow: 0 16px 30px -12px rgba(0, 0, 0, 0.5);
+    background: var(--surface-3);
+  }
+  .queue :global(.handle) {
+    display: grid;
+    place-items: center;
+    width: 22px;
+    height: 30px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--faint);
+    cursor: grab;
+    touch-action: none;
+  }
+  .queue :global(.handle:active) {
+    cursor: grabbing;
+  }
+  .queue :global(.handle svg) {
+    width: 16px;
+    fill: currentColor;
+  }
+  .queue :global(.q-len) {
+    margin-left: auto;
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    color: var(--faint);
+  }
+  .queue :global(.remove) {
+    width: 24px;
+    height: 24px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--faint);
+    font-size: 0.75rem;
+    opacity: 0.6;
+    transition: opacity 0.2s, color 0.2s, background 0.2s;
+  }
+  .queue :global(li:hover .remove) {
+    opacity: 1;
+  }
+  .queue :global(.remove:hover) {
+    color: var(--red);
+    background: color-mix(in srgb, var(--red) 12%, transparent);
+  }
+  .queue-empty {
+    margin: 0.4rem 0 0;
+    padding: 1rem;
+    border: 1px dashed var(--border-strong);
+    border-radius: 12px;
+    color: var(--faint);
+    font-size: 0.85rem;
+    text-align: center;
+  }
+  /* ---------- Console ---------- */
+  .console-card {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: color-mix(in srgb, var(--bg) 70%, var(--surface));
+    max-height: 640px;
+  }
+  .console-head {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    padding: 0.7rem 0.9rem;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.8rem;
+    color: var(--muted);
+  }
+  .console-head button {
+    margin-left: auto;
+    padding: 0.15rem 0.55rem;
+    border-radius: 6px;
+    border: 1px solid var(--border-strong);
+    background: transparent;
+    color: var(--muted);
+    font-size: 0.72rem;
+  }
+  .console-head button:hover {
+    color: var(--text);
+  }
+  .console {
+    flex: 1;
+    min-height: 320px;
+    padding: 0.6rem 0.4rem 0.6rem 0.7rem;
+    overflow-y: auto;
+    font-family: var(--mono);
+    font-size: 0.74rem;
+    line-height: 1.55;
+  }
+  .console :global(.line) {
+    display: flex;
+    gap: 0.5rem;
+    align-items: baseline;
+    padding: 0.12rem 0.3rem;
+    border-radius: 6px;
+    animation: line-in 0.35s var(--ease-out);
+  }
+  @keyframes line-in {
+    from {
+      opacity: 0;
+      transform: translateX(-6px);
+      background: color-mix(in srgb, var(--coral) 10%, transparent);
+    }
+  }
+  .console :global(.time) {
+    flex: none;
+    color: var(--faint);
+    white-space: pre;
+    font-size: 0.66rem;
+    opacity: 0.75;
+  }
+  .console :global(.prompt) {
+    color: var(--coral);
+  }
+  .console :global(code) {
+    color: var(--tok-text);
+    word-break: break-word;
+  }
+  .console :global(.badge) {
+    flex: none;
+    padding: 0 0.4rem;
+    border-radius: 5px;
+    font-weight: 600;
+    color: var(--mint);
+    background: color-mix(in srgb, var(--mint) 13%, transparent);
+  }
+  .console :global(.badge.http) {
+    color: var(--sky);
+    background: color-mix(in srgb, var(--sky) 13%, transparent);
+  }
+  .console :global(.detail) {
+    color: var(--muted);
+    min-width: 0;
+  }
+  .console :global(.json) {
+    color: var(--muted);
+    opacity: 0.9;
+  }
+  .console :global(.note) {
+    color: var(--faint);
+    font-style: italic;
+  }
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 0.9rem;
+    align-items: center;
+    padding: 0.55rem 0.9rem;
+    border-top: 1px solid var(--border);
+    font-size: 0.72rem;
+    color: var(--faint);
+  }
+  .legend i {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    margin-right: 0.35rem;
+    border-radius: 2px;
+  }
+  .k-call {
+    background: var(--coral);
+  }
+  .k-http {
+    background: var(--sky);
+  }
+  .k-event {
+    background: var(--mint);
+  }
+  .legend a {
+    margin-left: auto;
+    color: var(--coral);
+    font-weight: 600;
+  }
+  @media (max-width: 1100px) {
+    .demo {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .console-card {
+      grid-column: 1 / -1;
+      max-height: 420px;
+    }
+    .console {
+      min-height: 240px;
+    }
+  }
+  @media (max-width: 720px) {
+    .demo {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .queue-card {
+      max-height: 520px;
+    }
+  }
+</style>

@@ -1,0 +1,98 @@
+---
+title: Search and sources
+description: Search tracks, load URLs and pick where results come from.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+```js
+const result = await raya.search('lofi beats', { source: 'spotify', requester: user });
+// or on a player: player.search(query, options)
+```
+
+## Results are normalized
+
+Lavalink returns five different shapes. Raya turns them into one, so `result.tracks` is **always an array**:
+
+| Field | Description |
+| --- | --- |
+| `type` | `'track'`, `'playlist'`, `'search'`, `'empty'` or `'error'` |
+| `tracks` | The track, the search hits or the playlist tracks |
+| `playlist` | `{ name, selectedTrack, duration, pluginInfo }` for playlists |
+| `exception` | Lavalink's error for `'error'` results |
+| `identifier` | What was sent to Lavalink, e.g. `spsearch:lofi beats` |
+| `cached` | Whether it came from the search cache |
+
+```js
+switch (result.type) {
+  case 'playlist': return `Queued ${result.tracks.length} tracks from ${result.playlist.name}`;
+  case 'error':    return `Failed: ${result.exception.message}`;
+  case 'empty':    return 'Nothing found';
+  default:         return `Found ${result.tracks[0].info.title}`;
+}
+```
+
+## Default source
+
+Queries that aren't URLs are prefixed with `defaultSearchSource` (default `'youtube'`), unless you pass `source`. Friendly aliases and raw Lavalink prefixes both work, so `'spotify'` and `'spsearch'` are the same:
+
+```js
+new Raya({ nodes, connector, defaultSearchSource: 'spsearch' });
+
+await raya.search('daft punk');                           // spsearch:daft punk
+await raya.search('daft punk', { source: 'soundcloud' }); // scsearch:daft punk
+await raya.search('https://open.spotify.com/track/...');  // URLs pass through
+await raya.search('scsearch:chill');                      // prefixed queries pass through
+```
+
+| Alias | Prefix | Needs |
+| --- | --- | --- |
+| `youtube` | `ytsearch` | youtube-source plugin |
+| `youtubemusic` | `ytmsearch` | youtube-source plugin |
+| `soundcloud` | `scsearch` | built in |
+| `bandcamp` | `bcsearch` | built in |
+| `spotify` | `spsearch` | LavaSrc |
+| `applemusic` | `amsearch` | LavaSrc |
+| `deezer` | `dzsearch` | LavaSrc |
+| `yandexmusic` | `ymsearch` | LavaSrc |
+| `tidal` | `tdsearch` | LavaSrc |
+| `jiosaavn` | `jssearch` | LavaSrc |
+| `vkmusic` | `vksearch` | LavaSrc |
+| `qobuz` | `qbsearch` | LavaSrc |
+
+Any other prefix is passed through as-is, so custom plugin sources work too.
+
+## Requesters
+
+Pass `requester` and every returned track carries it. It shows up again in `trackStart`, `trackEnd` and the queue.
+
+```js
+const result = await player.search(query, { requester: interaction.user });
+raya.on('trackStart', (player, track) => console.log(track.requester.username));
+```
+
+Keep requesters small with [`requesterTransformer`](../typescript/#typed-requester).
+
+## Caching and de-duplication
+
+- Identical searches running at the same time share **one** request.
+- Successful results are cached (LRU, 500 entries, 5 minutes by default). Each result gets its own track objects, so requesters never leak between searches.
+
+```js
+new Raya({ nodes, connector, searchCache: { maxSize: 1000, ttl: 600_000 } });
+new Raya({ nodes, connector, searchCache: false });   // disable
+await raya.search(query, { cache: false });           // skip for one call
+```
+
+<Aside type="tip">
+If a node doesn't answer a search, Raya retries it on the next best node automatically.
+</Aside>
+
+## Decoding tracks
+
+Encoded tracks are decoded **locally**, with no REST call:
+
+```js
+const track = raya.decodeTrack(encoded, requester);
+const tracks = raya.decodeTracks([a, b, c]);
+```

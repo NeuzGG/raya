@@ -1,0 +1,97 @@
+---
+title: Raya
+description: The Raya class, the entry point that manages nodes, players and search.
+---
+
+```ts
+import { Raya } from 'raya.js';
+const raya = new Raya(options);
+```
+
+`Raya` extends a typed `EventEmitter`. See [events](../events/).
+
+## Lifecycle
+
+| Method | Returns | Description |
+| --- | --- | --- |
+| `init(userId?)` | `Promise<this>` | Connect every node. Called by connectors automatically. Safe to call more than once. |
+| `shutdown()` | `Promise<RayaSnapshot>` | Save players and close connections without destroying players |
+| `snapshot()` | `RayaSnapshot` | Serializable state of every player |
+| `destroy()` | `Promise<void>` | Destroy every player, close nodes, unload plugins |
+| `use(plugin)` | `Promise<this>` | Load a `RayaPlugin` |
+
+## Players
+
+| Method | Returns | Description |
+| --- | --- | --- |
+| `join(options)` | `Promise<Player>` | Create a player and join voice |
+| `createPlayer(options)` | `Player` | Create a player, or return the existing one |
+| `getPlayer(guildId)` | `Player \| undefined` | Get a player |
+| `destroyPlayer(guildId, reason?)` | `Promise<boolean>` | Destroy a player |
+
+## Search
+
+| Method | Returns | Description |
+| --- | --- | --- |
+| `search(query, options?)` | `Promise<SearchResult>` | Search or load a URL. Options: `source`, `node`, `requester`, `cache` |
+| `decodeTrack(encoded, requester?)` | `Track` | Decode locally |
+| `decodeTracks(encoded[], requester?)` | `Track[]` | Decode many locally |
+
+## Nodes
+
+| Member | Type | Description |
+| --- | --- | --- |
+| `nodes` | `Map<string, Node>` | All nodes |
+| `readyNodes` | `Node[]` | Nodes with a ready session |
+| `getNode(name)` | `Node \| undefined` | Get a node |
+| `addNode(options)` | `Node` | Add a node (connects if Raya is initialized) |
+| `removeNode(name)` | `Promise<boolean>` | Remove a node, moving its players |
+| `bestNode({ region?, guildId?, exclude? })` | `Node` | Least loaded ready node |
+
+## Gateway
+
+| Method | Description |
+| --- | --- |
+| `handleRaw(packet)` | Feed raw Discord gateway packets. Connectors do this for you. |
+| `updateVoiceState(packet)` | Alias of `handleRaw` |
+
+## Properties
+
+| Property | Type | Description |
+| --- | --- | --- |
+| `players` | `Map<string, Player>` | Players by guild id |
+| `userId` | `string \| null` | Bot user id after `init` |
+| `initialized` | `boolean` | Whether `init` finished |
+| `stats` | `RayaStats` | `{ nodes, readyNodes, players, playingPlayers, cache }` |
+| `defaultSearchSource` | `string` | The configured default source |
+| `playerDefaults` | `ResolvedPlayerDefaults` | Resolved player defaults |
+| `voiceStatus` | `VoiceStatus \| null` | Voice status updater when enabled |
+| `connector` | `Connector \| null` | The connector in use |
+| `searchCache` | `LRUCache \| null` | The search cache |
+| `clientName` | `string` | Sent as `Client-Name` |
+
+## Plugins
+
+A plugin is an object with a `name`, a `load` function and an optional `unload`:
+
+```js
+await raya.use({
+  name: 'stats-logger',
+  load(raya) {
+    raya.on('trackStart', (player, track) => metrics.increment('tracks_started'));
+  },
+  unload(raya) {},
+});
+```
+
+## Other exports
+
+```ts
+import {
+  Connectors, DiscordJSConnector, ErisConnector, OceanicConnector,
+  VoiceStatus, EqualizerPresets, SearchSources,
+  decodeTrack, tryDecodeTrack, encodeTrack, buildIdentifier, isUrl,
+  defaultAutoplay, relatedQueries,
+  RayaError, RestError, LRUCache, TypedEmitter, VERSION,
+} from 'raya.js';
+```

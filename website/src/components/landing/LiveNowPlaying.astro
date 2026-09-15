@@ -1,0 +1,427 @@
+---
+import { SITE } from '../../site.mjs';
+import { link } from '../../utils/links';
+
+const feedUrl: string = (import.meta.env.PUBLIC_LIVE_FEED_URL || SITE.liveFeed || '').trim();
+---
+
+{
+  feedUrl && (
+    <section class="section live" id="live" data-live-feed data-url={feedUrl}>
+      <div class="container">
+        <header class="section-head" data-reveal>
+          <span class="eyebrow live-eyebrow">
+            <span class="rec" aria-hidden="true" />
+            Live
+          </span>
+          <h2>
+            Playing <span class="gradient-text">right now</span>
+          </h2>
+          <p>Real-time from servers that chose to share what they're listening to. Cards update the moment a song changes.</p>
+        </header>
+
+        <div class="status" data-status data-state="connecting" role="status">
+          <span class="dot" aria-hidden="true" />
+          <span data-status-text>Connecting to the bot…</span>
+        </div>
+
+        <div class="grid" data-grid aria-live="off" />
+
+        <div class="empty" data-empty hidden>
+          <svg class="vinyl" viewBox="0 0 120 120" aria-hidden="true">
+            <circle cx="60" cy="60" r="56" />
+            <circle cx="60" cy="60" r="40" class="groove" />
+            <circle cx="60" cy="60" r="28" class="groove" />
+            <circle cx="60" cy="60" r="14" class="label" />
+            <circle cx="60" cy="60" r="3" class="hole" />
+          </svg>
+          <strong>Nothing is playing in public servers right now.</strong>
+          <span>Check back soon. This updates by itself.</span>
+        </div>
+
+        <div class="empty" data-offline hidden>
+          <strong>The bot is offline or can't be reached right now.</strong>
+          <span>It reconnects automatically when the bot comes back.</span>
+        </div>
+
+        <p class="note" data-reveal>
+          Bot owners choose which servers appear. No usernames are ever shared.{' '}
+          <a href={link('guides/live-now-playing/')}>Add this to your bot →</a>
+        </p>
+      </div>
+    </section>
+  )
+}
+
+<script>
+  import { mountLiveFeed } from '../../scripts/live-feed';
+  document.querySelectorAll<HTMLElement>('[data-live-feed]').forEach(mountLiveFeed);
+</script>
+
+<style>
+  .live {
+    background: radial-gradient(ellipse 55% 45% at 50% 0%, color-mix(in srgb, var(--rose) 9%, transparent), transparent 70%);
+  }
+  .live-eyebrow {
+    color: var(--red);
+  }
+  .rec {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--red);
+    animation: rec 1.4s ease-in-out infinite;
+  }
+  @keyframes rec {
+    50% {
+      opacity: 0.3;
+    }
+  }
+  .status {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.55rem;
+    width: fit-content;
+    margin: -1.5rem auto 1.8rem;
+    padding: 0.35rem 0.9rem;
+    border-radius: 999px;
+    border: 1px solid var(--border-strong);
+    background: color-mix(in srgb, var(--surface) 80%, transparent);
+    font-size: 0.85rem;
+    color: var(--muted);
+  }
+  .dot {
+    position: relative;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--amber);
+  }
+  .status[data-state='live'] .dot {
+    background: var(--mint);
+  }
+  .status[data-state='live'] .dot::after {
+    content: '';
+    position: absolute;
+    inset: -4px;
+    border-radius: 50%;
+    border: 2px solid var(--mint);
+    animation: pulse 1.8s ease-out infinite;
+  }
+  .status[data-state='offline'] .dot {
+    background: var(--red);
+  }
+  .status[data-state='connecting'] .dot,
+  .status[data-state='reconnecting'] .dot {
+    animation: rec 0.9s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    from {
+      transform: scale(0.5);
+      opacity: 0.9;
+    }
+    to {
+      transform: scale(1.7);
+      opacity: 0;
+    }
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
+    gap: 14px;
+  }
+  .live.is-offline .grid {
+    opacity: 0.55;
+    filter: grayscale(0.4);
+    transition: opacity 0.4s, filter 0.4s;
+  }
+  .grid :global(.live-card) {
+    position: relative;
+    display: grid;
+    grid-template-columns: 96px minmax(0, 1fr);
+    gap: 0.95rem;
+    padding: 0.9rem;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    background: var(--surface);
+    box-shadow: var(--shadow-lg);
+    overflow: hidden;
+    transition: border-color 0.3s, transform 0.4s var(--ease-out);
+  }
+  .grid :global(.live-card:hover) {
+    transform: translateY(-3px);
+    border-color: var(--border-strong);
+  }
+  .grid :global(.live-card.enter) {
+    animation: card-in 0.6s var(--ease-out) both;
+  }
+  .grid :global(.live-card.leave) {
+    animation: card-out 0.45s var(--ease-out) forwards;
+    pointer-events: none;
+  }
+  @keyframes card-in {
+    from {
+      opacity: 0;
+      transform: translateY(18px) scale(0.97);
+    }
+  }
+  @keyframes card-out {
+    to {
+      opacity: 0;
+      transform: scale(0.94);
+    }
+  }
+  .grid :global(.live-card.swap .art),
+  .grid :global(.live-card.swap .title),
+  .grid :global(.live-card.swap .author) {
+    animation: swap 0.55s var(--ease-out);
+  }
+  @keyframes swap {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+      filter: blur(3px);
+    }
+  }
+  .grid :global(.art) {
+    --h: 20;
+    position: relative;
+    width: 96px;
+    height: 96px;
+    border-radius: 14px;
+    overflow: hidden;
+    background: linear-gradient(135deg, hsl(var(--h) 85% 62%), hsl(calc(var(--h) + 50) 80% 45%));
+  }
+  .grid :global(.art img) {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .grid :global(.art-fallback) {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    color: #fff;
+    font-family: var(--display);
+    font-weight: 800;
+    font-size: 2rem;
+  }
+  .grid :global(.bars) {
+    position: absolute;
+    right: 6px;
+    top: 6px;
+    display: flex;
+    align-items: flex-end;
+    gap: 3px;
+    height: 18px;
+    padding: 3px 5px;
+    border-radius: 6px;
+    background: rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(4px);
+  }
+  .grid :global(.bars i) {
+    width: 3px;
+    height: 100%;
+    border-radius: 2px;
+    background: #fff;
+    transform-origin: bottom;
+    animation: eq 0.8s ease-in-out infinite alternate;
+  }
+  .grid :global(.bars i:nth-child(2)) {
+    animation-delay: -0.25s;
+  }
+  .grid :global(.bars i:nth-child(3)) {
+    animation-delay: -0.5s;
+  }
+  .grid :global(.bars i:nth-child(4)) {
+    animation-delay: -0.15s;
+  }
+  .grid :global(.is-paused .bars i) {
+    animation: none;
+    transform: scaleY(0.25);
+  }
+  @keyframes eq {
+    from {
+      transform: scaleY(0.25);
+    }
+  }
+  .grid :global(.body) {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+  .grid :global(.title) {
+    font-family: var(--display);
+    font-size: 1.08rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .grid :global(a.title[href]:hover) {
+    text-decoration: underline;
+    text-decoration-color: var(--coral);
+  }
+  .grid :global(.author) {
+    font-size: 0.88rem;
+    color: var(--muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .grid :global(.server) {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    margin-top: 0.45rem;
+    min-width: 0;
+  }
+  .grid :global(.icon) {
+    --h: 200;
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 6px;
+    overflow: hidden;
+    background: hsl(var(--h) 60% 50%);
+    color: #fff;
+    font-size: 0.65rem;
+    font-weight: 700;
+  }
+  .grid :global(.icon img) {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .grid :global(.server-name) {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .grid :global(.progress) {
+    height: 4px;
+    margin-top: auto;
+    border-radius: 4px;
+    background: var(--surface-3);
+    overflow: hidden;
+  }
+  .grid :global(.fill) {
+    display: block;
+    height: 100%;
+    width: 0;
+    border-radius: inherit;
+    background: var(--grad);
+    transition: width 0.25s linear;
+  }
+  .grid :global(.is-paused .fill) {
+    background: var(--faint);
+  }
+  .grid :global(.meta) {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.3rem;
+    margin-top: 0.45rem;
+  }
+  .grid :global(.time) {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    color: var(--faint);
+    font-variant-numeric: tabular-nums;
+  }
+  .grid :global(.badges) {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+  }
+  .grid :global(.badge) {
+    padding: 0.02rem 0.4rem;
+    border-radius: 999px;
+    font-size: 0.66rem;
+    font-weight: 600;
+    color: var(--muted);
+    background: var(--surface-2);
+  }
+  .grid :global(.badge.paused) {
+    color: var(--amber);
+    background: color-mix(in srgb, var(--amber) 14%, transparent);
+  }
+  .grid :global(.src-spotify) {
+    color: #1ed760;
+    background: rgba(30, 215, 96, 0.12);
+  }
+  .grid :global(.src-youtube) {
+    color: #ff5a5a;
+    background: rgba(255, 90, 90, 0.12);
+  }
+  .grid :global(.src-soundcloud) {
+    color: #ff8a3d;
+    background: rgba(255, 138, 61, 0.12);
+  }
+  .empty {
+    display: grid;
+    justify-items: center;
+    gap: 0.35rem;
+    padding: 2.5rem 1rem;
+    border-radius: var(--radius);
+    border: 1px dashed var(--border-strong);
+    text-align: center;
+    color: var(--muted);
+  }
+  .empty strong {
+    color: var(--text);
+  }
+  .vinyl {
+    width: 84px;
+    margin-bottom: 0.4rem;
+    animation: spin 6s linear infinite;
+  }
+  .vinyl circle {
+    fill: var(--surface-3);
+  }
+  .vinyl .groove {
+    fill: none;
+    stroke: var(--border-strong);
+  }
+  .vinyl .label {
+    fill: var(--coral);
+  }
+  .vinyl .hole {
+    fill: var(--bg);
+  }
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  .note {
+    margin: 1.6rem 0 0;
+    text-align: center;
+    font-size: 0.9rem;
+    color: var(--faint);
+  }
+  .note a {
+    font-weight: 600;
+    color: var(--coral);
+  }
+  @media (max-width: 420px) {
+    .grid :global(.live-card) {
+      grid-template-columns: 72px minmax(0, 1fr);
+    }
+    .grid :global(.art) {
+      width: 72px;
+      height: 72px;
+    }
+  }
+</style>

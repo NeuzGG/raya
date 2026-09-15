@@ -1,0 +1,17 @@
+---
+title: Filter Lab
+description: Combine audio filters and see the code and the exact payload Raya sends to Lavalink.
+tableOfContents: false
+---
+
+import FilterLab from '../../../components/tools/FilterLab.astro';
+
+Mix presets and effects. The lab uses the same math as Raya's `Filters` class, so the **Sent to Lavalink** panel shows what the player really sends. Filters that are off are left out of the payload.
+
+<FilterLab />
+
+- `bassBoost` only changes bands 0-4, so it layers on top of any equalizer preset.
+- Nightcore, vaporwave and custom speed all use the `timescale` filter, so only one can be active.
+- Changing speed also changes how fast `player.position` moves.
+
+Read the [filters guide](../../guides/filters/) for every method.

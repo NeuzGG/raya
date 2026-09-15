@@ -1,0 +1,781 @@
+---
+const sources = [
+  ['youtube', 'YouTube (youtube-source)'],
+  ['youtubemusic', 'YouTube Music (youtube-source)'],
+  ['soundcloud', 'SoundCloud (built in)'],
+  ['spotify', 'Spotify (LavaSrc)'],
+  ['applemusic', 'Apple Music (LavaSrc)'],
+  ['deezer', 'Deezer (LavaSrc)'],
+  ['yandexmusic', 'Yandex Music (LavaSrc)'],
+  ['tidal', 'Tidal (LavaSrc)'],
+  ['jiosaavn', 'JioSaavn (LavaSrc)'],
+  ['bandcamp', 'Bandcamp (built in)'],
+];
+const timeouts = [
+  ['false', 'Never'],
+  ['30000', '30 seconds'],
+  ['60000', '1 minute'],
+  ['120000', '2 minutes'],
+  ['300000', '5 minutes'],
+];
+---
+
+<div class="not-content raya-widget builder" data-config-builder>
+  <div class="layout">
+    <form class="controls" onsubmit="return false">
+      <section>
+        <h3>Discord library</h3>
+        <div class="segmented" data-radio="library">
+          <button type="button" data-value="discordjs" aria-pressed="true">discord.js</button>
+          <button type="button" data-value="eris" aria-pressed="false">Eris</button>
+          <button type="button" data-value="oceanic" aria-pressed="false">Oceanic</button>
+          <button type="button" data-value="custom" aria-pressed="false">Other</button>
+        </div>
+        <div class="segmented small" data-radio="module">
+          <button type="button" data-value="cjs" aria-pressed="true">CommonJS</button>
+          <button type="button" data-value="esm" aria-pressed="false">ESM</button>
+        </div>
+      </section>
+
+      <section>
+        <h3>Lavalink nodes</h3>
+        <div class="nodes" data-nodes></div>
+        <button type="button" class="ghost" data-add-node>+ Add node</button>
+      </section>
+
+      <section>
+        <h3>Search and playback</h3>
+        <label class="field">
+          <span>Default search source</span>
+          <select data-field="source">
+            {sources.map(([value, label]) => <option value={value}>{label}</option>)}
+          </select>
+        </label>
+        <label class="field">
+          <span>Volume <output data-out="volume">100</output></span>
+          <input type="range" min="0" max="200" step="5" value="100" data-field="volume" />
+        </label>
+        <label class="field">
+          <span>Loop</span>
+          <select data-field="loop">
+            <option value="off">Off</option>
+            <option value="track">Track</option>
+            <option value="queue">Queue</option>
+          </select>
+        </label>
+        <label class="switch"><input type="checkbox" data-field="autoplay" /><span class="track"><span class="thumb"></span></span>Autoplay related tracks</label>
+      </section>
+
+      <section>
+        <h3>Auto-leave</h3>
+        <label class="field">
+          <span>Leave after the queue ends</span>
+          <select data-field="queueEnd">
+            {timeouts.map(([value, label]) => <option value={value}>{label}</option>)}
+          </select>
+        </label>
+        <label class="field">
+          <span>Leave when the channel is empty</span>
+          <select data-field="empty">
+            {timeouts.map(([value, label]) => <option value={value}>{label}</option>)}
+          </select>
+        </label>
+        <label class="switch"><input type="checkbox" data-field="pauseOnEmpty" /><span class="track"><span class="thumb"></span></span>Pause while nobody listens</label>
+      </section>
+
+      <section>
+        <h3>Extras</h3>
+        <label class="switch"><input type="checkbox" data-field="voiceStatus" checked /><span class="track"><span class="thumb"></span></span>Voice channel status</label>
+        <div class="indent" data-when="voiceStatus">
+          <label class="field">
+            <span>Template</span>
+            <input type="text" data-field="template" value="🎶 {title} - {author}" spellcheck="false" />
+          </label>
+          <p class="preview">Preview: <strong data-preview></strong></p>
+        </div>
+        <label class="switch"><input type="checkbox" data-field="restore" checked /><span class="track"><span class="thumb"></span></span>Restart without stopping music (snapshots)</label>
+        <label class="switch"><input type="checkbox" data-field="debug" /><span class="track"><span class="thumb"></span></span>Debug logging</label>
+        <label class="switch"><input type="checkbox" data-field="events" checked /><span class="track"><span class="thumb"></span></span>Example event listeners</label>
+      </section>
+    </form>
+
+    <div class="result">
+      <div class="window">
+        <div class="window-head">
+          <span class="dots"><i></i><i></i><i></i></span>
+          <span class="file" data-filename>bot.js</span>
+          <span class="lines" data-lines></span>
+          <button type="button" class="copy" data-copy>Copy</button>
+        </div>
+        <pre data-output></pre>
+      </div>
+      <div class="actions">
+        <button type="button" class="ghost" data-share>Copy share link</button>
+        <button type="button" class="ghost" data-reset>Reset</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  import { highlight, escapeHtml } from '../../scripts/highlight';
+
+  interface NodeRow {
+    name: string;
+    host: string;
+    port: string;
+    password: string;
+    secure: boolean;
+  }
+  interface BuilderState {
+    library: string;
+    module: string;
+    nodes: NodeRow[];
+    source: string;
+    volume: number;
+    loop: string;
+    autoplay: boolean;
+    queueEnd: string;
+    empty: string;
+    pauseOnEmpty: boolean;
+    voiceStatus: boolean;
+    template: string;
+    restore: boolean;
+    debug: boolean;
+    events: boolean;
+  }
+
+  const DEFAULTS: BuilderState = {
+    library: 'discordjs',
+    module: 'cjs',
+    nodes: [{ name: 'main', host: 'localhost', port: '2333', password: 'youshallnotpass', secure: false }],
+    source: 'youtube',
+    volume: 100,
+    loop: 'off',
+    autoplay: false,
+    queueEnd: 'false',
+    empty: 'false',
+    pauseOnEmpty: false,
+    voiceStatus: true,
+    template: '🎶 {title} - {author}',
+    restore: true,
+    debug: false,
+    events: true,
+  };
+
+  const str = (value: string) => `'${value.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
+
+  function generate(s: BuilderState): string {
+    const esm = s.module === 'esm';
+    const out: string[] = [];
+    const imp = (names: string, from: string, def = false) =>
+      esm
+        ? def
+          ? `import ${names} from '${from}';`
+          : `import { ${names} } from '${from}';`
+        : def
+          ? `const ${names} = require('${from}');`
+          : `const { ${names} } = require('${from}');`;
+
+    if (s.restore) out.push(esm ? "import fs from 'node:fs';" : "const fs = require('node:fs');");
+    if (s.library === 'discordjs') out.push(imp('Client, GatewayIntentBits', 'discord.js'));
+    if (s.library === 'eris') out.push(imp('Eris', 'eris', true));
+    if (s.library === 'oceanic') out.push(imp('Client', 'oceanic.js'));
+    out.push(imp(s.library === 'custom' ? 'Raya' : 'Raya, Connectors', 'raya.js'));
+    out.push('');
+
+    if (s.library === 'discordjs') {
+      out.push('const client = new Client({', '  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates],', '});', '');
+    } else if (s.library === 'eris') {
+      out.push("const client = new Eris(`Bot ${process.env.DISCORD_TOKEN}`, {", "  intents: ['guilds', 'guildVoiceStates'],", '});', '');
+    } else if (s.library === 'oceanic') {
+      out.push('const client = new Client({', '  auth: `Bot ${process.env.DISCORD_TOKEN}`,', "  gateway: { intents: ['GUILDS', 'GUILD_VOICE_STATES'] },", '});', '');
+    }
+
+    if (s.restore) {
+      out.push(
+        '// Players saved by raya.shutdown() in the previous run',
+        'let restore;',
+        "if (fs.existsSync('raya-snapshot.json')) {",
+        "  restore = JSON.parse(fs.readFileSync('raya-snapshot.json', 'utf8'));",
+        "  fs.unlinkSync('raya-snapshot.json');",
+        '}',
+        '',
+      );
+    }
+
+    const opts: string[] = [];
+    opts.push('  nodes: [');
+    for (const node of s.nodes) {
+      const parts = [`name: ${str(node.name || 'node')}`, `host: ${str(node.host || 'localhost')}`];
+      const port = Number(node.port);
+      if (node.port && !(node.secure ? port === 443 : port === 2333)) parts.push(`port: ${port || 2333}`);
+      parts.push(`password: ${str(node.password)}`);
+      if (node.secure) parts.push('secure: true');
+      opts.push(`    { ${parts.join(', ')} },`);
+    }
+    opts.push('  ],');
+
+    if (s.library === 'discordjs') opts.push('  connector: new Connectors.DiscordJS(client),');
+    if (s.library === 'eris') opts.push('  connector: new Connectors.Eris(client),');
+    if (s.library === 'oceanic') opts.push('  connector: new Connectors.Oceanic(client),');
+    if (s.library === 'custom') opts.push('  send: (guildId, payload) => {', '    // send the opcode 4 payload through the shard that owns guildId', '  },');
+    if (s.source !== 'youtube') opts.push(`  defaultSearchSource: ${str(s.source)},`);
+
+    const defaults: string[] = [];
+    if (s.volume !== 100) defaults.push(`volume: ${s.volume}`);
+    if (s.loop !== 'off') defaults.push(`loop: ${str(s.loop)}`);
+    if (s.autoplay) defaults.push('autoplay: true');
+    if (s.queueEnd !== 'false') defaults.push(`queueEndTimeout: ${Number(s.queueEnd).toLocaleString('en-US').replace(/,/g, '_')}`);
+    if (s.empty !== 'false') defaults.push(`emptyChannelTimeout: ${Number(s.empty).toLocaleString('en-US').replace(/,/g, '_')}`);
+    if (s.pauseOnEmpty) defaults.push('pauseOnEmpty: true');
+    if (defaults.length) {
+      opts.push('  playerDefaults: {');
+      defaults.forEach((d) => opts.push(`    ${d},`));
+      opts.push('  },');
+    }
+    if (s.voiceStatus) {
+      opts.push(s.template === 'Now playing: {title}' ? '  voiceStatus: true,' : `  voiceStatus: { template: ${str(s.template)} },`);
+    }
+    if (s.debug) opts.push('  debug: true,');
+    if (s.restore) opts.push('  restore,');
+
+    out.push('const raya = new Raya({', ...opts, '});', '');
+
+    if (s.events) {
+      out.push(
+        "raya.on('nodeReady', (node, resumed) => console.log(`Node ${node.name} ready (resumed: ${resumed})`));",
+        "raya.on('nodeError', (node, error) => console.error(`Node ${node.name}:`, error.message));",
+        '',
+        "raya.on('trackStart', (player, track) => {",
+        '  console.log(`[${player.guildId}] Now playing ${track.info.title}`);',
+        '});',
+        '',
+        "raya.on('queueEnd', (player) => {",
+        '  console.log(`[${player.guildId}] Queue finished`);',
+        '});',
+        '',
+      );
+    }
+
+    if (s.restore) {
+      out.push(
+        '// Save players and exit without stopping the music',
+        'async function shutdown() {',
+        "  fs.writeFileSync('raya-snapshot.json', JSON.stringify(await raya.shutdown()));",
+        '  process.exit(0);',
+        '}',
+        "process.on('SIGINT', shutdown);",
+        "process.on('SIGTERM', shutdown);",
+        '',
+      );
+    }
+
+    if (s.library === 'discordjs') out.push('client.login(process.env.DISCORD_TOKEN);');
+    if (s.library === 'eris' || s.library === 'oceanic') out.push('client.connect();');
+    if (s.library === 'custom') {
+      out.push(
+        '// Forward every raw gateway packet ({ t, d }) to Raya:',
+        "gateway.on('dispatch', (packet) => raya.handleRaw(packet));",
+        '',
+        '// Once your client is logged in:',
+        'raya.init(botUserId);',
+      );
+    }
+    return out.join('\n');
+  }
+
+  function formatPreview(template: string): string {
+    const values: Record<string, string> = {
+      title: 'Neon Tide',
+      author: 'Lumen Coast',
+      duration: '3:12',
+      requester: 'mika',
+      source: 'spotify',
+      uri: 'https://open.spotify.com/track/…',
+      identifier: '4uLU6hMCjMI75M1A2tKUQC',
+    };
+    const text = template.replace(/\{(\w+)\}/g, (match, key: string) => values[key] ?? match);
+    return text.length > 500 ? `${text.slice(0, 499)}…` : text || '(empty)';
+  }
+
+  document.querySelectorAll<HTMLElement>('[data-config-builder]').forEach((root) => {
+    let state: BuilderState = structuredClone(DEFAULTS);
+    try {
+      const shared = new URLSearchParams(location.hash.slice(1)).get('config');
+      if (shared) state = { ...state, ...JSON.parse(decodeURIComponent(atob(shared))) };
+    } catch {
+      /* ignore invalid share links */
+    }
+
+    const q = <T extends Element>(selector: string) => root.querySelector<T>(selector)!;
+    const nodesEl = q<HTMLElement>('[data-nodes]');
+    const output = q<HTMLElement>('[data-output]');
+    let code = '';
+
+    function renderNodes() {
+      nodesEl.innerHTML = state.nodes
+        .map(
+          (node, i) => `
+          <div class="node" data-index="${i}">
+            <input aria-label="Node name" placeholder="name" data-node="name" value="${escapeHtml(node.name)}" />
+            <input aria-label="Host" placeholder="host" data-node="host" value="${escapeHtml(node.host)}" />
+            <input aria-label="Port" placeholder="port" data-node="port" inputmode="numeric" value="${escapeHtml(node.port)}" />
+            <input aria-label="Password" placeholder="password" data-node="password" value="${escapeHtml(node.password)}" />
+            <label class="mini"><input type="checkbox" data-node="secure" ${node.secure ? 'checked' : ''} /> SSL</label>
+            <button type="button" class="remove" data-remove aria-label="Remove node" ${state.nodes.length === 1 ? 'disabled' : ''}>✕</button>
+          </div>`,
+        )
+        .join('');
+    }
+
+    function syncFields() {
+      root.querySelectorAll<HTMLElement>('[data-radio]').forEach((group) => {
+        const key = group.dataset.radio as keyof BuilderState;
+        group.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.value === state[key])));
+      });
+      root.querySelectorAll<HTMLInputElement | HTMLSelectElement>('[data-field]').forEach((field) => {
+        const key = field.dataset.field as keyof BuilderState;
+        if (field instanceof HTMLInputElement && field.type === 'checkbox') field.checked = Boolean(state[key]);
+        else field.value = String(state[key]);
+      });
+      q<HTMLElement>('[data-out="volume"]').textContent = String(state.volume);
+      root.querySelectorAll<HTMLElement>('[data-when]').forEach((el) => {
+        el.hidden = !state[el.dataset.when as keyof BuilderState];
+      });
+    }
+
+    function update() {
+      code = generate(state);
+      output.innerHTML = highlight(code);
+      q<HTMLElement>('[data-lines]').textContent = `${code.split('\n').length} lines`;
+      q<HTMLElement>('[data-filename]').textContent = state.module === 'esm' ? 'bot.mjs' : 'bot.js';
+      q<HTMLElement>('[data-preview]').textContent = formatPreview(state.template);
+      output.classList.remove('flash');
+      void output.offsetWidth;
+      output.classList.add('flash');
+    }
+
+    root.querySelectorAll<HTMLElement>('[data-radio]').forEach((group) =>
+      group.addEventListener('click', (event) => {
+        const button = (event.target as HTMLElement).closest('button');
+        if (!button) return;
+        (state as unknown as Record<string, unknown>)[group.dataset.radio!] = button.dataset.value;
+        syncFields();
+        update();
+      }),
+    );
+
+    root.querySelectorAll<HTMLInputElement | HTMLSelectElement>('[data-field]').forEach((field) =>
+      field.addEventListener(field instanceof HTMLInputElement && field.type !== 'checkbox' ? 'input' : 'change', () => {
+        const key = field.dataset.field!;
+        const value =
+          field instanceof HTMLInputElement && field.type === 'checkbox'
+            ? field.checked
+            : field instanceof HTMLInputElement && field.type === 'range'
+              ? Number(field.value)
+              : field.value;
+        (state as unknown as Record<string, unknown>)[key] = value;
+        syncFields();
+        update();
+      }),
+    );
+
+    nodesEl.addEventListener('input', (event) => {
+      const input = event.target as HTMLInputElement;
+      const row = input.closest<HTMLElement>('.node');
+      if (!row || !input.dataset.node) return;
+      const node = state.nodes[Number(row.dataset.index)]!;
+      if (input.dataset.node === 'secure') {
+        node.secure = input.checked;
+        if (node.secure && node.port === '2333') node.port = '443';
+        if (!node.secure && node.port === '443') node.port = '2333';
+        renderNodes();
+      } else {
+        (node as unknown as Record<string, unknown>)[input.dataset.node] = input.value;
+      }
+      update();
+    });
+
+    nodesEl.addEventListener('click', (event) => {
+      const button = (event.target as HTMLElement).closest('[data-remove]');
+      if (!button || state.nodes.length === 1) return;
+      state.nodes.splice(Number(button.closest<HTMLElement>('.node')!.dataset.index), 1);
+      renderNodes();
+      update();
+    });
+
+    q<HTMLButtonElement>('[data-add-node]').addEventListener('click', () => {
+      const n = state.nodes.length + 1;
+      state.nodes.push({ name: `node${n}`, host: `node${n}.example.com`, port: '443', password: 'youshallnotpass', secure: true });
+      renderNodes();
+      update();
+      nodesEl.querySelector<HTMLInputElement>('.node:last-child input')?.focus();
+    });
+
+    const flashButton = (button: HTMLButtonElement, text: string) => {
+      const original = button.textContent;
+      button.textContent = text;
+      setTimeout(() => (button.textContent = original), 1500);
+    };
+
+    q<HTMLButtonElement>('[data-copy]').addEventListener('click', async (event) => {
+      const button = event.currentTarget as HTMLButtonElement;
+      try {
+        await navigator.clipboard.writeText(code);
+        flashButton(button, 'Copied!');
+      } catch {
+        flashButton(button, 'Select to copy');
+      }
+    });
+
+    q<HTMLButtonElement>('[data-share]').addEventListener('click', async (event) => {
+      const button = event.currentTarget as HTMLButtonElement;
+      const encoded = btoa(encodeURIComponent(JSON.stringify(state)));
+      const url = `${location.origin}${location.pathname}#config=${encodeURIComponent(encoded)}`;
+      history.replaceState(null, '', url);
+      try {
+        await navigator.clipboard.writeText(url);
+        flashButton(button, 'Link copied!');
+      } catch {
+        flashButton(button, 'Link is in the address bar');
+      }
+    });
+
+    q<HTMLButtonElement>('[data-reset]').addEventListener('click', () => {
+      state = structuredClone(DEFAULTS);
+      history.replaceState(null, '', location.pathname);
+      renderNodes();
+      syncFields();
+      update();
+    });
+
+    renderNodes();
+    syncFields();
+    update();
+  });
+</script>
+
+<style>
+  :global(:root) {
+    --sl-content-width: 60rem;
+  }
+  .builder {
+    padding: 1rem;
+  }
+  .layout {
+    display: grid;
+    gap: 1.25rem;
+  }
+  @media (min-width: 72rem) {
+    .layout {
+      grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+      align-items: start;
+    }
+    .result {
+      position: sticky;
+      top: calc(var(--sl-nav-height, 4rem) + 1rem);
+    }
+  }
+  section {
+    padding-bottom: 1rem;
+    margin-bottom: 1rem;
+    border-bottom: 1px solid var(--sl-color-gray-5);
+    display: grid;
+    gap: 0.65rem;
+  }
+  section:last-child {
+    border-bottom: 0;
+    margin-bottom: 0;
+  }
+  h3 {
+    margin: 0;
+    font-size: 0.72rem;
+    font-weight: 650;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--sl-color-gray-3);
+  }
+  .segmented {
+    display: inline-flex;
+    flex-wrap: wrap;
+    justify-self: start;
+    padding: 0.2rem;
+    gap: 0.15rem;
+    border: 1px solid var(--sl-color-gray-5);
+    border-radius: 0.65rem;
+    background: var(--sl-color-black);
+  }
+  .segmented button {
+    padding: 0.35rem 0.75rem;
+    border: 0;
+    border-radius: 0.45rem;
+    background: transparent;
+    color: var(--sl-color-gray-2);
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+  }
+  .segmented.small button {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.6rem;
+  }
+  .segmented button:hover {
+    color: var(--sl-color-white);
+  }
+  .segmented button[aria-pressed='true'] {
+    background: var(--raya-gradient);
+    color: #fff;
+  }
+  .field {
+    display: grid;
+    gap: 0.3rem;
+    font-size: 0.85rem;
+    color: var(--sl-color-gray-2);
+  }
+  .field span {
+    display: flex;
+    justify-content: space-between;
+  }
+  .field output {
+    font-family: var(--sl-font-mono);
+    color: var(--sl-color-white);
+  }
+  select,
+  input[type='text'],
+  .node input:not([type='checkbox']) {
+    width: 100%;
+    padding: 0.45rem 0.6rem;
+    border: 1px solid var(--sl-color-gray-5);
+    border-radius: 0.5rem;
+    background: var(--sl-color-black);
+    color: var(--sl-color-white);
+    font-size: 0.85rem;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  select:focus,
+  input[type='text']:focus,
+  .node input:focus {
+    outline: 0;
+    border-color: var(--sl-color-accent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--sl-color-accent) 22%, transparent);
+  }
+  input[type='range'] {
+    accent-color: var(--raya-coral);
+  }
+  .nodes {
+    display: grid;
+    gap: 0.45rem;
+  }
+  .nodes :global(.node) {
+    display: grid;
+    grid-template-columns: 1fr 1.4fr 0.7fr 1.2fr auto auto;
+    gap: 0.35rem;
+    align-items: center;
+    animation: slide-in 0.3s ease-out;
+  }
+  @keyframes slide-in {
+    from {
+      opacity: 0;
+      transform: translateY(-6px);
+    }
+  }
+  .nodes :global(input) {
+    width: 100%;
+    min-width: 0;
+    padding: 0.4rem 0.5rem;
+    border: 1px solid var(--sl-color-gray-5);
+    border-radius: 0.45rem;
+    background: var(--sl-color-black);
+    color: var(--sl-color-white);
+    font-size: 0.8rem;
+    font-family: var(--sl-font-mono);
+  }
+  .nodes :global(input[type='checkbox']) {
+    width: auto;
+    accent-color: var(--raya-coral);
+  }
+  .nodes :global(.mini) {
+    display: inline-flex;
+    gap: 0.25rem;
+    align-items: center;
+    font-size: 0.75rem;
+    color: var(--sl-color-gray-3);
+  }
+  .nodes :global(.remove) {
+    border: 0;
+    background: transparent;
+    color: var(--sl-color-gray-3);
+    cursor: pointer;
+    padding: 0.2rem 0.4rem;
+    border-radius: 0.3rem;
+  }
+  .nodes :global(.remove:hover:not(:disabled)) {
+    color: #ff6b7a;
+    background: color-mix(in srgb, #ff6b7a 12%, transparent);
+  }
+  .nodes :global(.remove:disabled) {
+    opacity: 0.3;
+    cursor: not-allowed;
+  }
+  @media (max-width: 40rem) {
+    .nodes :global(.node) {
+      grid-template-columns: 1fr 1fr;
+      padding: 0.5rem;
+      border: 1px solid var(--sl-color-gray-5);
+      border-radius: 0.6rem;
+    }
+  }
+  .ghost {
+    justify-self: start;
+    padding: 0.4rem 0.85rem;
+    border: 1px dashed var(--sl-color-gray-4);
+    border-radius: 0.55rem;
+    background: transparent;
+    color: var(--sl-color-gray-2);
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: color 0.2s, border-color 0.2s, background 0.2s;
+  }
+  .ghost:hover {
+    color: var(--sl-color-white);
+    border-color: var(--sl-color-accent);
+    background: color-mix(in srgb, var(--sl-color-accent) 8%, transparent);
+  }
+  .switch {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    font-size: 0.88rem;
+    color: var(--sl-color-gray-1);
+    cursor: pointer;
+  }
+  .switch input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .switch .track {
+    position: relative;
+    flex: none;
+    width: 2.1rem;
+    height: 1.2rem;
+    border-radius: 999px;
+    background: var(--sl-color-gray-5);
+    transition: background 0.2s;
+  }
+  .switch .thumb {
+    position: absolute;
+    top: 0.15rem;
+    left: 0.15rem;
+    width: 0.9rem;
+    height: 0.9rem;
+    border-radius: 50%;
+    background: #fff;
+    transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .switch input:checked + .track {
+    background: var(--raya-coral);
+  }
+  .switch input:checked + .track .thumb {
+    transform: translateX(0.9rem);
+  }
+  .switch input:focus-visible + .track {
+    outline: 2px solid var(--sl-color-accent);
+    outline-offset: 2px;
+  }
+  .indent {
+    margin-left: 2.65rem;
+    display: grid;
+    gap: 0.35rem;
+  }
+  .preview {
+    margin: 0;
+    font-size: 0.8rem;
+    color: var(--sl-color-gray-3);
+  }
+  .preview strong {
+    color: var(--sl-color-white);
+    font-weight: 500;
+  }
+  .window {
+    border: 1px solid var(--sl-color-gray-5);
+    border-radius: 0.85rem;
+    background: var(--sl-color-black);
+    overflow: hidden;
+    box-shadow: 0 24px 60px -30px color-mix(in srgb, var(--raya-coral) 45%, transparent);
+  }
+  .window-head {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.55rem 0.8rem;
+    border-bottom: 1px solid var(--sl-color-gray-5);
+    background: var(--sl-color-gray-6);
+  }
+  .dots {
+    display: inline-flex;
+    gap: 0.3rem;
+  }
+  .dots i {
+    width: 0.6rem;
+    height: 0.6rem;
+    border-radius: 50%;
+    background: #ff5f57;
+  }
+  .dots i:nth-child(2) {
+    background: #febc2e;
+  }
+  .dots i:nth-child(3) {
+    background: #28c840;
+  }
+  .file {
+    font-family: var(--sl-font-mono);
+    font-size: 0.8rem;
+    color: var(--sl-color-gray-1);
+  }
+  .lines {
+    font-size: 0.72rem;
+    color: var(--sl-color-gray-3);
+    margin-right: auto;
+  }
+  .copy {
+    padding: 0.2rem 0.65rem;
+    border: 0;
+    border-radius: 0.4rem;
+    background: var(--raya-gradient);
+    color: #fff;
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.2s;
+  }
+  .copy:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px -8px var(--raya-coral);
+  }
+  pre {
+    margin: 0;
+    padding: 0.9rem 1rem;
+    max-height: 70vh;
+    overflow: auto;
+    font-family: var(--sl-font-mono);
+    font-size: 0.8rem;
+    line-height: 1.65;
+    color: var(--tok-text);
+    tab-size: 2;
+  }
+  pre.flash {
+    animation: flash 0.5s ease-out;
+  }
+  @keyframes flash {
+    from {
+      background: color-mix(in srgb, var(--raya-coral) 7%, transparent);
+    }
+  }
+  .actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.6rem;
+  }
+</style>

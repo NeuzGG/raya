@@ -1,0 +1,54 @@
+---
+title: Migrating from LavaFlow
+description: Move a LavaFlow bot to Raya and pick up the bug fixes.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+Raya started from LavaFlow's code and was rebuilt for correctness and resilience. Most concepts map directly.
+
+## API changes
+
+| LavaFlow | Raya |
+| --- | --- |
+| `new Manager({ nodes, send })` + `manager.init(id)` | `new Raya({ nodes, connector })` (or `send` + `init`) |
+| `defaultSearchPlatform: 'spsearch'` | `defaultSearchSource: 'spsearch'` |
+| `autoPlay: true` | `playerDefaults: { autoplay: true }` |
+| `debug: true` | `debug: true` (same) |
+| `manager.updateVoiceState(packet)` | `raya.handleRaw(packet)` (the old name still works) |
+| `manager.create(options)` | `raya.createPlayer(options)` or `await raya.join(options)` |
+| `manager.get(guildId)` | `raya.getPlayer(guildId)` |
+| `manager.search(query)` | `raya.search(query)` or `player.search(query)` |
+| `player.addTrack(t)` / `addTracks(ts)` | `player.queue.add(t \| ts)` or `player.enqueue(result)` |
+| `player.setVolume(0-100)` | `player.setVolume(0-1000)`, where 100 is normal |
+| `player.setLoopMode(mode)` | `player.setLoop(mode)` |
+| `player.filters().bassboost().apply()` | `await player.filters.bassBoost()` |
+| `player.moveTrack` / `swapTracks` / `removeTrack` | `player.queue.move` / `swap` / `remove` |
+| `player.saveQueue()` / `restoreQueue()` | `raya.shutdown()` / `new Raya({ restore })` |
+| `result.loadType` + `result.data` | `result.type` + `result.tracks` |
+| `manager.destroyPlayer(guildId)` | `player.destroy()` or `raya.destroyPlayer(guildId)` |
+
+<Aside type="caution">
+Options that moved (`autoPlay`, `defaultSearchPlatform`, …) print a `RayaWarning` if you keep the old names, so nothing breaks silently.
+</Aside>
+
+## Bugs fixed
+
+| LavaFlow | Raya |
+| --- | --- |
+| `setVolume(100)` sent 1000, **ten times too loud** | 100 means unchanged |
+| Idle nodes were disconnected after about 60 s | WebSocket pings; idle nodes stay connected |
+| Resuming sent the v3 `Resume-Key` header, so it never worked | v4 `Session-Id` resuming |
+| A global `NodeManager` meant separate managers shared nodes | Each `Raya` owns its nodes |
+| `play()` could run before the node had a session | Players only use ready nodes |
+| The health check permanently removed reconnecting nodes | Nodes reconnect with backoff, and players fail over |
+| Used `fetch` while claiming Node 16 support | Requires Node 18.17+ |
+
+## What you gain
+
+- [Restarts without silence](../restarts/)
+- [Automatic failover](../resilience/)
+- [Voice channel status](../voice-status/)
+- [Smarter autoplay](../autoplay/)
+- [Empty-channel auto-leave](../auto-leave/)
+- Request batching, local track decoding and a search cache

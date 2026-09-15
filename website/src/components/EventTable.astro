@@ -1,0 +1,35 @@
+---
+import { EVENTS, type EventCategory } from '../data/events';
+
+const order: EventCategory[] = ['Lifecycle', 'Node', 'Player', 'Track', 'Queue', 'Plugin'];
+---
+
+{
+  order.map((category) => (
+    <>
+      <h2 id={category.toLowerCase()}>{category} events</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Event</th>
+            <th>Arguments</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          {EVENTS.filter((event) => event.category === category).map((event) => (
+            <tr>
+              <td>
+                <code>{event.name}</code>
+              </td>
+              <td>
+                <code>{event.args}</code>
+              </td>
+              <td>{event.description}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </>
+  ))
+}

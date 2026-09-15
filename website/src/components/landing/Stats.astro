@@ -1,0 +1,108 @@
+---
+const stats = [
+  { value: 1, label: 'runtime dependency', hint: 'just ws' },
+  { value: 63, label: 'automated tests', hint: 'against a Lavalink v4 simulator' },
+  { value: 12, label: 'search sources', hint: 'YouTube to Qobuz' },
+  { value: 4, label: 'calls → 1 request', hint: 'same-tick batching', suffix: '→1' },
+];
+---
+
+<section class="stats" aria-label="Raya in numbers">
+  <div class="container row">
+    {
+      stats.map((stat, i) => (
+        <div class="stat" data-reveal style={`--delay: ${i * 0.08}s`}>
+          <strong>
+            <span data-count={stat.value}>{stat.value}</span>
+            {stat.suffix && <span class="suffix">{stat.suffix}</span>}
+          </strong>
+          <span class="label">{stat.suffix ? 'calls, one request' : stat.label}</span>
+          <span class="hint">{stat.hint}</span>
+        </div>
+      ))
+    }
+  </div>
+</section>
+
+<script>
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const counters = document.querySelectorAll<HTMLElement>('[data-count]');
+  const observer = new IntersectionObserver(
+    (entries) => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue;
+        observer.unobserve(entry.target);
+        const el = entry.target as HTMLElement;
+        const target = Number(el.dataset.count);
+        if (reduce) continue;
+        const start = performance.now();
+        const duration = 1200 + target * 6;
+        const tick = (now: number) => {
+          const p = Math.min(1, (now - start) / duration);
+          const eased = 1 - Math.pow(1 - p, 4);
+          el.textContent = String(Math.round(target * eased));
+          if (p < 1) requestAnimationFrame(tick);
+        };
+        el.textContent = '0';
+        requestAnimationFrame(tick);
+      }
+    },
+    { threshold: 0.6 },
+  );
+  counters.forEach((el) => observer.observe(el));
+</script>
+
+<style>
+  .stats {
+    position: relative;
+    border-block: 1px solid var(--border);
+    background: var(--bg-2);
+  }
+  .row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+  }
+  .stat {
+    display: grid;
+    gap: 0.1rem;
+    padding: 1.9rem 1.2rem;
+    text-align: center;
+  }
+  .stat + .stat {
+    border-left: 1px solid var(--border);
+  }
+  strong {
+    font-family: var(--display);
+    font-size: clamp(2.2rem, 4vw, 3rem);
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -0.04em;
+    background: var(--grad);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    font-variant-numeric: tabular-nums;
+  }
+  .suffix {
+    margin-left: 0.1em;
+  }
+  .label {
+    margin-top: 0.4rem;
+    font-weight: 600;
+  }
+  .hint {
+    font-size: 0.85rem;
+    color: var(--faint);
+  }
+  @media (max-width: 760px) {
+    .row {
+      grid-template-columns: repeat(2, 1fr);
+    }
+    .stat:nth-child(3) {
+      border-left: 0;
+    }
+    .stat:nth-child(n + 3) {
+      border-top: 1px solid var(--border);
+    }
+  }
+</style>

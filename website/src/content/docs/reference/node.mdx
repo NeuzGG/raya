@@ -1,0 +1,64 @@
+---
+title: Node
+description: Lavalink node connections and the REST client.
+---
+
+```ts
+const node = raya.getNode('main');
+```
+
+## Properties
+
+| Property | Type | Description |
+| --- | --- | --- |
+| `name` | `string` | Node name |
+| `options` | `ResolvedNodeOptions` | Options with defaults applied |
+| `state` | `NodeState` | `idle`, `connecting`, `ready`, `reconnecting`, `disconnected` or `destroyed` |
+| `connected` | `boolean` | Has a ready session |
+| `sessionId` | `string \| null` | Lavalink session id |
+| `stats` | `NodeStats \| null` | Latest stats from Lavalink |
+| `info` | `NodeInfo \| null` | `/v4/info`, fetched on connect |
+| `ping` | `number` | WebSocket latency in ms |
+| `penalty` | `number` | Load score, lower is better, `Infinity` when not ready |
+| `players` | `Set<Player>` | Players on this node |
+| `reconnectAttempts` | `number` | Attempts since the last ready |
+| `uptime` | `number` | Server uptime in ms |
+| `rest` | `Rest` | REST client |
+
+## Methods
+
+| Method | Returns | Description |
+| --- | --- | --- |
+| `connect()` | `Promise<void>` | Connect; resolves on `ready` |
+| `disconnect(code?, reason?)` | `void` | Close without reconnecting; the session stays resumable |
+| `destroy()` | `void` | Close permanently |
+| `hasPlugin(name)` | `boolean` | From `/v4/info` |
+| `hasSource(name)` | `boolean` | From `/v4/info` |
+| `hasFilter(name)` | `boolean` | From `/v4/info` |
+| `matchesRegion(region)` | `boolean` | Region routing check |
+
+## REST client
+
+`node.rest` sends authenticated requests with timeouts. `GET` requests are retried on network errors, 429 and 502-504.
+
+| Method | Endpoint |
+| --- | --- |
+| `request(method, path, { body?, query?, retries?, timeout? })` | Any endpoint |
+| `loadTracks(identifier)` | `GET /v4/loadtracks` |
+| `decodeTrack(encoded)` / `decodeTracks(encoded[])` | `/v4/decodetrack(s)` |
+| `getPlayers()` / `getPlayer(guildId)` | `GET /v4/sessions/:id/players` |
+| `updatePlayer(guildId, payload, noReplace?)` | `PATCH /v4/sessions/:id/players/:guild` |
+| `destroyPlayer(guildId)` | `DELETE /v4/sessions/:id/players/:guild` |
+| `updateSession({ resuming, timeout })` | `PATCH /v4/sessions/:id` |
+| `info()` / `stats()` / `version()` | `/v4/info`, `/v4/stats`, `/version` |
+| `routePlannerStatus()` | `GET /v4/routeplanner/status` |
+| `unmarkFailedAddress(address)` / `unmarkAllFailedAddresses()` | `POST /v4/routeplanner/free/...` |
+| `getLyrics(encoded)` / `getPlayerLyrics(guildId)` | LavaLyrics |
+| `subscribeLyrics(guildId)` / `unsubscribeLyrics(guildId)` | LavaLyrics |
+| `loadSearch(query, types?)` | LavaSearch |
+| `getSponsorBlockCategories` / `setSponsorBlockCategories` / `clearSponsorBlockCategories` | SponsorBlock |
+
+| Property | Description |
+| --- | --- |
+| `requests` | Total requests sent |
+| `latency` | Average latency of successful requests in ms |

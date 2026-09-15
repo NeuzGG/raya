@@ -1,0 +1,10 @@
+node_modules/
+dist/
+build/
+.astro/
+.claude/
+*.tgz
+raya-snapshot.json
+.env
+.env.*
+!.env.example

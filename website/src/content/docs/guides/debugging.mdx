@@ -1,0 +1,73 @@
+---
+title: Debugging
+description: See what Raya is doing and fix common problems.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+```js
+new Raya({ nodes, connector, debug: true });                          // prints "[Raya] ..." to the console
+new Raya({ nodes, connector, debug: (message) => logger.debug(message) }); // your own logger
+raya.on('debug', (message) => {});                                     // or listen to the event
+```
+
+Messages are only built when something is listening, so leaving debug off costs nothing.
+
+## What you'll see
+
+```
+[Raya] Raya 1.0.0 created with 1 node(s), default search source "spsearch"
+[Raya] [Node main] connecting to ws://localhost:2333/v4/websocket
+[Raya] [Node main] ready (session b1c2d3e4, resumed: false)
+[Raya] [Player 1234] created on node main
+[Raya] [Player 1234] voice state received (channel 5678)
+[Raya] [Player 1234] voice server received (c-ams01-abc.discord.media:443)
+[Raya] [Player 1234] voice forwarded to node main
+[Raya] Search "spsearch:lofi" -> search (10 tracks)
+[Raya] [Player 1234] playing "Lofi Study" (spotify) on node main
+[Raya] [Player 1234] track ended "Lofi Study" (finished)
+[Raya] [Player 1234] autoplay "spsearch:Chill Artist" -> search (10 tracks), picked "Rainy Nights"
+```
+
+## Common problems
+
+### `VOICE_TIMEOUT` when joining
+
+Lavalink never received voice credentials. Check that:
+
+- The bot has the **Guild Voice States** intent.
+- The connector is created **before** logging in, or, without a connector, every raw packet reaches `raya.handleRaw()`.
+- With debug on, you see both `voice state received` and `voice server received`.
+
+### `NO_NODES`
+
+No Lavalink node is ready. Look for `[Node ...]` lines: a wrong host or port shows reconnect attempts, and a wrong password shows `NODE_AUTH_FAILED`.
+
+### Search returns `error` or `empty`
+
+Your node may not have that source. `node.hasSource('spotify')` tells you, and the [sources table](../search/#default-source) lists which plugin each source needs.
+
+### Autoplay doesn't continue
+
+- Make sure it's on: `playerDefaults: { autoplay: true }` or `player.setAutoplay(true)`. A top-level `autoplay` is ignored and prints a warning.
+- The debug log shows every query autoplay tries and why each result was or wasn't used.
+
+### Voice channel status doesn't change
+
+The bot needs the **Set Voice Channel Status** permission. Add `onError` to `voiceStatus` to see Discord's response.
+
+<Aside type="tip">
+Include the debug output when asking for help. It usually shows the problem right away.
+</Aside>
+
+## Inspecting state
+
+```js
+raya.stats;            // { nodes, readyNodes, players, playingPlayers, cache }
+raya.readyNodes;       // connected nodes
+node.penalty;          // load score
+node.ping;             // WebSocket latency in ms
+node.rest.latency;     // average REST latency in ms
+player.voiceState;     // voice credentials Raya knows about
+raya.on('nodeRaw', (node, payload) => {}); // every WebSocket message
+```
