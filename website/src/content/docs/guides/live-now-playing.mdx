@@ -1,60 +1,95 @@
 ---
 title: Live now playing
-description: Show what your bot is playing, in real time, on your website.
+description: Connect your bot to your website and show what it's playing, in real time.
 ---
 
 import { Steps, Aside, Tabs, TabItem } from '@astrojs/starlight/components';
 
-`NowPlayingFeed` lets your website show what your bot is playing right now: track, artwork, progress and server. It updates the moment a song changes, pauses or ends.
+`NowPlayingFeed` connects your bot to your website. The site shows your bot (avatar, name, online status) and the song it's playing right now, with artwork and a live progress bar. It updates the moment a song starts, pauses or ends.
 
-Only servers you opt in are shown, and **no usernames or requesters are ever shared**.
+Only the song is shared: **no server names, server ids or usernames**.
 
 ## How it works
 
-Your website can't talk to Discord or Lavalink directly, so your bot shares the data:
+Websites can't ask Discord what a bot is playing, so your bot shares it:
 
 ```
-Lavalink  →  your bot (Raya + NowPlayingFeed)  →  your website (live cards)
+Lavalink  →  your bot (Raya + NowPlayingFeed)  →  your website
                         GET /now-playing          JSON snapshot
                         GET /now-playing/stream   live updates (Server-Sent Events)
 ```
 
-## Set up the feed
+## Connect your bot
+
+<Aside type="tip">The [official Raya bot](../../getting-started/official-bot/) has this built in: set `LIVE_FEED_PORT=8787` in `bot/.env` and skip to step 2.</Aside>
 
 <Steps>
 
-1. **Decide which servers are public.** `publish` gets a guild id and returns how that server should appear, or `null` to keep it private. The simplest opt-in is a list of guild ids:
+1. **Add the feed to your bot.** `bot` is how your bot appears on the site. A function keeps the name and avatar up to date:
 
    ```js title="bot.js"
    const { NowPlayingFeed } = require('raya.js');
 
-   const PUBLIC_SERVERS = new Set(['123456789012345678', '234567890123456789']);
-
    const feed = new NowPlayingFeed({
      port: 8787,
      cors: 'https://neuzgg.github.io', // your website origin
-     publish: (guildId) => {
-       if (!PUBLIC_SERVERS.has(guildId)) return null;
-       const guild = client.guilds.cache.get(guildId);
-       return guild ? { name: guild.name, icon: guild.iconURL() } : null;
-     },
+     bot: () => ({
+       name: client.user?.username ?? 'Raya',
+       avatar: client.user?.displayAvatarURL({ size: 256 }),
+       url: 'https://discord.com/oauth2/authorize?client_id=YOUR_CLIENT_ID', // optional "Add to Discord" button
+     }),
    });
 
    await raya.use(feed);
    ```
 
-2. **Check it works.** Play something in a public server and open `http://localhost:8787/now-playing`. You should see JSON with the track.
+2. **Check it works.** Play something and open `http://localhost:8787/now-playing`. You should see your bot and the song.
 
-3. **Make it reachable over HTTPS.** Websites on HTTPS (like GitHub Pages) can't load `http://` feeds. Put the feed behind HTTPS, for example:
-   - a reverse proxy (Caddy, Nginx) on your bot's server with a domain, or
-   - a Cloudflare Tunnel: `cloudflared tunnel --url http://localhost:8787`
+3. **Make it reachable over HTTPS.** Websites on HTTPS (like GitHub Pages) can't load `http://` feeds. The easiest way is a Cloudflare Tunnel, which also works if your bot runs at home:
 
-4. **Point the website at it.** In `website/src/site.mjs` set `liveFeed: 'https://bot.example.com/now-playing'`, or set the `PUBLIC_LIVE_FEED_URL` environment variable when building. The **Playing right now** section appears on the landing page.
+   ```sh
+   cloudflared tunnel --url http://localhost:8787
+   ```
+
+   It prints a `https://….trycloudflare.com` address. For a permanent address, use a named tunnel or a reverse proxy (Caddy, Nginx) with your own domain.
+
+4. **Point the website at it.**
+   - **GitHub Pages:** in your repository go to **Settings → Secrets and variables → Actions → Variables**, add `LIVE_FEED_URL` = `https://your-address/now-playing`, then re-run the **Deploy docs** workflow.
+   - **Anywhere else:** set `liveFeed` in `website/src/site.mjs`, or the `PUBLIC_LIVE_FEED_URL` environment variable when building.
 
 </Steps>
 
+The landing page then shows a **Now playing live** card, and the floating card in the hero shows the bot's real song. Without a feed, both stay hidden, so the site never shows fake data.
+
+## Which song is shown
+
+If your bot plays in several servers at once, the site keeps showing the same song while it plays, so the card doesn't jump around. When that song pauses or ends, it switches to the most recently started song. To keep some servers out completely, pass a filter:
+
+```js
+new NowPlayingFeed({
+  bot: () => ({ name: client.user.username, avatar: client.user.displayAvatarURL() }),
+  nowPlaying: (guildId) => !PRIVATE_SERVERS.has(guildId), // these servers never supply the song
+});
+```
+
+## Optional: per-server cards
+
+To also show individual servers that opt in, add `publish`. It returns how a server appears, or `null` to keep it private:
+
+```js
+const PUBLIC_SERVERS = new Set(['123456789012345678']);
+
+new NowPlayingFeed({
+  bot: () => ({ name: client.user.username, avatar: client.user.displayAvatarURL() }),
+  publish: (guildId) => {
+    const guild = PUBLIC_SERVERS.has(guildId) && client.guilds.cache.get(guildId);
+    return guild ? { name: guild.name, icon: guild.iconURL() } : null;
+  },
+});
+```
+
 <Aside type="tip" title="Let server admins opt in">
-Instead of a hard-coded list, add a command like `/live on` that saves the guild id to your database, and check it in `publish`. `publish` is called often, so read from a cache (a `Set` or `Map`) rather than querying the database each time.
+Add a command like `/live on` that saves the guild id, and check it in `publish`. `publish` is called often, so read from a cache (a `Set` or `Map`), not the database.
 </Aside>
 
 ## Use your existing web server
@@ -64,7 +99,7 @@ Leave out `port` and mount the feed on a server you already run:
 <Tabs>
   <TabItem label="Express">
     ```js
-    const feed = new NowPlayingFeed({ publish });
+    const feed = new NowPlayingFeed({ bot });
     await raya.use(feed);
 
     app.get(['/now-playing', '/now-playing/stream'], (req, res) => feed.handle(req, res));
@@ -82,77 +117,79 @@ Leave out `port` and mount the feed on a server you already run:
 
 ## Show it on any website
 
-You don't need this docs site. The feed works with a few lines of plain JavaScript:
+You don't need this docs site. A few lines of plain JavaScript are enough:
 
 ```html
-<ul id="now-playing"></ul>
+<p id="now-playing">Connecting…</p>
 <script>
-  const list = document.getElementById('now-playing');
-  const feed = new EventSource('https://bot.example.com/now-playing/stream');
+  const text = document.getElementById('now-playing');
+  const feed = new EventSource('https://your-address/now-playing/stream');
 
   feed.addEventListener('snapshot', (event) => {
-    const { players } = JSON.parse(event.data);
-    list.replaceChildren(
-      ...players.map((p) => {
-        const item = document.createElement('li');
-        item.textContent = `${p.server.name}: ${p.track.title} by ${p.track.author}${p.paused ? ' (paused)' : ''}`;
-        return item;
-      }),
-    );
+    const { bot, nowPlaying } = JSON.parse(event.data);
+    text.textContent = nowPlaying
+      ? `${bot.name} is playing ${nowPlaying.track.title} by ${nowPlaying.track.author}`
+      : `${bot.name} is not playing anything`;
   });
+  feed.addEventListener('error', () => (text.textContent = 'Bot offline'));
 </script>
 ```
 
-Always set feed data with `textContent`, not `innerHTML`, because track titles come from the internet.
+Always set feed data with `textContent`, not `innerHTML`, because song titles come from the internet.
 
 ## Data format
 
 ```json
 {
-  "players": [
-    {
-      "id": "123456789012345678",
-      "server": { "name": "Lofi Lounge", "icon": "https://cdn.discordapp.com/icons/..." },
-      "track": {
-        "title": "Neon Tide",
-        "author": "Lumen Coast",
-        "uri": "https://open.spotify.com/track/...",
-        "artworkUrl": "https://i.scdn.co/image/...",
-        "source": "spotify",
-        "duration": 192000,
-        "isStream": false
-      },
-      "position": 64250,
-      "paused": false,
-      "speed": 1,
-      "loop": "off",
-      "queueSize": 3
-    }
-  ],
-  "totals": { "playing": 12 },
+  "bot": {
+    "name": "Raya",
+    "avatar": "https://cdn.discordapp.com/avatars/.../....png",
+    "url": "https://discord.com/oauth2/authorize?client_id=...",
+    "uptime": 11520000
+  },
+  "nowPlaying": {
+    "track": {
+      "title": "Blinding Lights",
+      "author": "The Weeknd",
+      "uri": "https://open.spotify.com/track/...",
+      "artworkUrl": "https://i.scdn.co/image/...",
+      "source": "spotify",
+      "duration": 200040,
+      "isStream": false
+    },
+    "position": 64250,
+    "paused": false,
+    "speed": 1
+  },
+  "players": [],
+  "totals": { "playing": 3 },
   "time": 1789000000000
 }
 ```
 
-`position` is the position when the snapshot was sent. To animate a progress bar, add `(now - receivedAt) × speed` while not paused. A new snapshot arrives on every track change, pause, seek or stop, and when position drifts by more than 2 seconds.
+`nowPlaying` is `null` when nothing is playing. `position` is the position when the snapshot was sent. To animate a progress bar, add `(now - receivedAt) × speed` while not paused. A new snapshot arrives on every song change, pause, seek or stop, and when the position drifts by more than 2 seconds.
 
 ## Options
 
 | Option | Default | Description |
 | --- | --- | --- |
-| `publish` | required | `(guildId) => { name, icon? } \| null`. Return `null` to keep a server private |
+| `bot` | – | `{ name, avatar?, url? }` or a function returning it. Enables the bot and its current song |
+| `nowPlaying` | `true` with `bot` | `false`, or `(guildId) => boolean` to choose which servers can supply the song |
+| `publish` | – | Optional per-server cards: `(guildId) => { name, icon? } \| null` |
 | `port` | – | Start a standalone server on this port |
 | `host` | all interfaces | Interface for the standalone server |
 | `path` | `'/now-playing'` | Snapshot URL; the stream is at `path + '/stream'` |
 | `cors` | `'*'` | `Access-Control-Allow-Origin` |
 | `interval` | `2000` | ms between checks for pauses, seeks and drift |
 | `maxClients` | `500` | Maximum simultaneous stream connections |
-| `includeTotals` | `true` | Include the number of playing servers (a count only) |
+| `includeTotals` | `true` | Include how many servers are playing (a count only) |
+
+You need `bot`, `publish`, or both.
 
 | Member | Description |
 | --- | --- |
 | `feed.url` | Standalone server URL once listening |
 | `feed.connections` | Connected stream clients |
-| `feed.snapshot()` | Current public data |
+| `feed.snapshot()` | Current data |
 | `feed.refresh()` | Push an update to every client now |
 | `feed.handle(req, res)` | Serve the feed on your own server; returns `false` for other URLs |

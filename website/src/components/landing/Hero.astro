@@ -1,6 +1,10 @@
 ---
 import { highlight } from '../../scripts/highlight';
 import { link } from '../../utils/links';
+import { SITE } from '../../site.mjs';
+
+// The floating "now playing" card only exists when the bot's live feed is connected.
+const liveEnabled = Boolean((import.meta.env.PUBLIC_LIVE_FEED_URL || SITE.liveFeed || '').trim());
 
 const snippet = `import { Raya, Connectors } from 'raya.js';
 
@@ -77,20 +81,23 @@ await player.enqueue(await player.search('neon tide'));`;
           <span class="toast-icon" data-toast-icon>⚡</span>
           <div>
             <strong data-toast-title>trackStart</strong>
-            <span data-toast-text>Neon Tide · Lumen Coast</span>
+            <span data-toast-text>a song just started</span>
           </div>
         </div>
       </div>
 
-      <div class="float-card" aria-hidden="true">
-        <div class="art"></div>
-        <div class="meta">
-          <strong>Neon Tide</strong>
-          <span>Lumen Coast</span>
-          <div class="mini-progress"><i></i></div>
-        </div>
-        <div class="eq"><i></i><i></i><i></i><i></i></div>
-      </div>
+      {liveEnabled && (
+        <a class="float-card" href="#live" data-hero-now hidden>
+          <div class="art" data-hero-art><span data-hero-initial></span></div>
+          <div class="meta">
+            <span class="live-tag"><i></i>Live on the bot</span>
+            <strong data-hero-title></strong>
+            <span data-hero-author></span>
+            <div class="mini-progress"><i data-hero-fill></i></div>
+          </div>
+          <div class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+        </a>
+      )}
     </div>
   </div>
 
@@ -98,6 +105,8 @@ await player.enqueue(await player.search('neon tide'));`;
 </section>
 
 <script>
+  import { livePosition, safeUrl, type LiveEventDetail } from '../../scripts/live-feed';
+
   // Install command switcher + copy
   const install = document.querySelector<HTMLElement>('[data-install]');
   if (install) {
@@ -132,27 +141,84 @@ await player.enqueue(await player.search('neon tide'));`;
   // Typewriter: reveal the pre-highlighted code character by character
   const typer = document.querySelector<HTMLElement>('[data-typer]');
   const toastEl = document.querySelector<HTMLElement>('[data-toast]');
+  let toastTimer: number | undefined;
+  function showToast(icon: string, title: string, text: string) {
+    if (!toastEl) return;
+    toastEl.querySelector('[data-toast-icon]')!.textContent = icon;
+    toastEl.querySelector('[data-toast-title]')!.textContent = title;
+    toastEl.querySelector('[data-toast-text]')!.textContent = text;
+    toastEl.classList.remove('show');
+    void toastEl.offsetWidth;
+    toastEl.classList.add('show');
+  }
   function startToasts() {
     if (!toastEl) return;
+    clearInterval(toastTimer);
     const toasts = [
-      ['⚡', 'trackStart', 'Neon Tide · Lumen Coast'],
-      ['🎶', 'voice status', 'Now playing: Neon Tide'],
-      ['🔁', 'nodeReady', 'main · resumed: true'],
-      ['✨', 'autoplay', 'picked "Glass Harbor"'],
-      ['🛟', 'playerNodeMove', 'tokyo → frankfurt'],
+      ['⚡', 'trackStart', 'a song just started'],
+      ['🔁', 'nodeReady', 'session resumed, nothing replayed'],
+      ['✨', 'autoplay', 'queued a related track'],
+      ['🛟', 'playerNodeMove', 'moved to a healthy node'],
+      ['🎶', 'voiceStatus', 'channel status updated'],
     ];
     let i = 0;
-    const show = () => {
+    const next = () => {
       const [icon, title, text] = toasts[i++ % toasts.length]!;
-      toastEl.querySelector('[data-toast-icon]')!.textContent = icon!;
-      toastEl.querySelector('[data-toast-title]')!.textContent = title!;
-      toastEl.querySelector('[data-toast-text]')!.textContent = text!;
-      toastEl.classList.remove('show');
-      void toastEl.offsetWidth;
-      toastEl.classList.add('show');
+      showToast(icon!, title!, text!);
     };
-    show();
-    setInterval(show, 3200);
+    next();
+    toastTimer = window.setInterval(next, 3200);
+  }
+
+  // Real "now playing" from the bot's live feed (see LiveNowPlaying.astro)
+  const heroNow = document.querySelector<HTMLAnchorElement>('[data-hero-now]');
+  if (heroNow) {
+    let latest: LiveEventDetail | null = null;
+    let shownKey = '';
+    const fill = heroNow.querySelector<HTMLElement>('[data-hero-fill]')!;
+    const updateProgress = () => {
+      const now = latest?.snapshot?.nowPlaying;
+      if (!now || heroNow.hidden) return;
+      const position = livePosition(now, latest!.receivedAt);
+      fill.style.width = now.track.isStream ? '100%' : `${Math.min(100, (position / (now.track.duration || 1)) * 100)}%`;
+    };
+    window.addEventListener('raya:live', (event) => {
+      latest = (event as CustomEvent<LiveEventDetail>).detail;
+      const now = latest.status === 'offline' ? null : latest.snapshot?.nowPlaying ?? null;
+      heroNow.hidden = !now;
+      if (!now) {
+        shownKey = '';
+        return;
+      }
+      heroNow.classList.toggle('is-paused', now.paused);
+      const key = `${now.track.title}${now.track.uri}`;
+      if (key !== shownKey) {
+        const isChange = shownKey !== '';
+        shownKey = key;
+        heroNow.querySelector('[data-hero-title]')!.textContent = now.track.title;
+        heroNow.querySelector('[data-hero-author]')!.textContent = now.track.author;
+        heroNow.setAttribute('aria-label', `Live on the bot: ${now.track.title} by ${now.track.author}`);
+        const art = heroNow.querySelector<HTMLElement>('[data-hero-art]')!;
+        art.querySelector('img')?.remove();
+        heroNow.querySelector('[data-hero-initial]')!.textContent = now.track.title.charAt(0).toUpperCase();
+        const artwork = safeUrl(now.track.artworkUrl);
+        if (artwork) {
+          const img = document.createElement('img');
+          img.alt = '';
+          img.referrerPolicy = 'no-referrer';
+          img.addEventListener('error', () => img.remove());
+          img.src = artwork;
+          art.prepend(img);
+        }
+        if (isChange) {
+          clearInterval(toastTimer);
+          showToast('🎶', 'Now playing', `${now.track.title} · ${now.track.author}`);
+          toastTimer = window.setTimeout(startToasts, 6400);
+        }
+      }
+      updateProgress();
+    });
+    setInterval(updateProgress, 1000);
   }
 
   if (typer) {
@@ -648,22 +714,55 @@ await player.enqueue(await player.search('neon tide'));`;
     background: color-mix(in srgb, var(--surface) 88%, transparent);
     backdrop-filter: blur(12px);
     box-shadow: var(--shadow-lg);
-    animation: float 6s ease-in-out infinite;
+    max-width: 280px;
+    animation: float 6s ease-in-out infinite, pop-in 0.6s var(--ease-spring);
+    transition: border-color 0.25s;
+  }
+  .float-card:hover {
+    border-color: color-mix(in srgb, var(--coral) 55%, var(--border-strong));
   }
   @keyframes float {
     50% {
       transform: translateY(-10px);
     }
   }
+  @keyframes pop-in {
+    from {
+      opacity: 0;
+      scale: 0.9;
+    }
+  }
   .float-card .art {
-    width: 40px;
-    height: 40px;
+    position: relative;
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
     border-radius: 10px;
+    overflow: hidden;
     background: linear-gradient(135deg, #ff4d8d, #ffb547);
+    color: #fff;
+    font-family: var(--display);
+    font-weight: 800;
+  }
+  .float-card .art img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
   }
   .float-card .meta {
     display: grid;
+    min-width: 0;
     line-height: 1.25;
+  }
+  .float-card strong,
+  .float-card [data-hero-author] {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .float-card strong {
     font-size: 0.85rem;
@@ -672,8 +771,26 @@ await player.enqueue(await player.search('neon tide'));`;
     font-size: 0.75rem;
     color: var(--muted);
   }
+  .float-card .live-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--red);
+  }
+  .live-tag i {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--red);
+    animation: blink 1.4s steps(1) infinite;
+  }
   .mini-progress {
-    width: 110px;
+    width: 120px;
+    max-width: 100%;
     height: 3px;
     margin-top: 0.35rem;
     border-radius: 3px;
@@ -682,17 +799,17 @@ await player.enqueue(await player.search('neon tide'));`;
   }
   .mini-progress i {
     display: block;
+    width: 0;
     height: 100%;
     background: var(--grad);
-    animation: progress 9s linear infinite;
+    transition: width 1s linear;
   }
-  @keyframes progress {
-    from {
-      width: 0;
-    }
-    to {
-      width: 100%;
-    }
+  .float-card.is-paused .mini-progress i {
+    background: var(--faint);
+  }
+  .float-card.is-paused .eq i {
+    animation: none;
+    transform: scaleY(0.25);
   }
   .eq {
     display: flex;

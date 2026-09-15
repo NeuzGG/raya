@@ -1,26 +1,44 @@
-/** Renders a NowPlayingFeed (Server-Sent Events) as live cards. Feed data is only ever set as text. */
+/**
+ * Renders a NowPlayingFeed (Server-Sent Events): the bot card, optional server cards, and a
+ * `raya:live` window event other components (like the hero) can listen to.
+ * Feed data is only ever set as text or validated http(s) URLs.
+ */
 
-interface LivePlayer {
-  id: string;
-  server: { name: string; icon: string | null };
-  track: { title: string; author: string; uri: string | null; artworkUrl: string | null; source: string; duration: number; isStream: boolean };
+interface LiveTrack {
+  title: string;
+  author: string;
+  uri: string | null;
+  artworkUrl: string | null;
+  source: string;
+  duration: number;
+  isStream: boolean;
+}
+
+interface LiveNowPlaying {
+  track: LiveTrack;
   position: number;
   paused: boolean;
   speed: number;
+}
+
+interface LivePlayer extends LiveNowPlaying {
+  id: string;
+  server: { name: string; icon: string | null };
   loop: 'off' | 'track' | 'queue';
   queueSize: number;
 }
 
-interface LiveSnapshot {
+export interface LiveSnapshot {
+  bot: { name: string; avatar: string | null; url: string | null; uptime: number } | null;
+  nowPlaying: LiveNowPlaying | null;
   players: LivePlayer[];
   totals: { playing: number } | null;
 }
 
-interface Card {
-  el: HTMLElement;
-  data: LivePlayer;
-  trackKey: string;
-  shownSecond: number;
+export interface LiveEventDetail {
+  status: 'connecting' | 'live' | 'reconnecting' | 'offline';
+  snapshot: LiveSnapshot | null;
+  receivedAt: number;
 }
 
 const SOURCE_NAMES: Record<string, string> = {
@@ -40,14 +58,30 @@ const SOURCE_NAMES: Record<string, string> = {
   http: 'Web',
 };
 
-const safeUrl = (value: unknown) => (typeof value === 'string' && /^https?:\/\//i.test(value) ? value : null);
+export const safeUrl = (value: unknown) => (typeof value === 'string' && /^https?:\/\//i.test(value) ? value : null);
+export const sourceKey = (source: string) => source.toLowerCase().replace(/[^a-z0-9]/g, '');
+export const sourceName = (source: string) => SOURCE_NAMES[sourceKey(source)] ?? source;
 
-const fmt = (ms: number) => {
+export const fmt = (ms: number) => {
   const total = Math.max(0, Math.floor(ms / 1000));
   const h = Math.floor(total / 3600);
   const m = Math.floor((total % 3600) / 60);
   const s = String(total % 60).padStart(2, '0');
   return h ? `${h}:${String(m).padStart(2, '0')}:${s}` : `${m}:${s}`;
+};
+
+const fmtUptime = (ms: number) => {
+  const minutes = Math.floor(ms / 60000);
+  const days = Math.floor(minutes / 1440);
+  const hours = Math.floor((minutes % 1440) / 60);
+  if (days) return `${days}d ${hours}h`;
+  if (hours) return `${hours}h ${minutes % 60}m`;
+  return `${Math.max(1, minutes)}m`;
+};
+
+export const livePosition = (entry: LiveNowPlaying, receivedAt: number, now = performance.now()) => {
+  const elapsed = entry.paused ? 0 : (now - receivedAt) * (entry.speed || 1);
+  return entry.track.isStream ? entry.position + elapsed : Math.min(entry.track.duration, entry.position + elapsed);
 };
 
 const hue = (text: string) => [...text].reduce((sum, ch) => (sum * 31 + ch.charCodeAt(0)) % 360, 7);
@@ -59,192 +93,216 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, t
   return node;
 }
 
+/** Replace an image inside `container`, falling back to nothing if it fails to load. */
+function setImage(container: HTMLElement, url: string | null, className: string) {
+  const existing = container.querySelector<HTMLImageElement>(`img.${className}`);
+  if (existing?.dataset.src === (url ?? '')) return;
+  existing?.remove();
+  if (!url) return;
+  const img = el('img', className);
+  img.alt = '';
+  img.decoding = 'async';
+  img.referrerPolicy = 'no-referrer';
+  img.dataset.src = url;
+  img.addEventListener('error', () => img.remove());
+  img.src = url;
+  container.prepend(img);
+}
+
 export function mountLiveFeed(root: HTMLElement): void {
   const url = root.dataset.url!.replace(/\/+$/, '');
-  const grid = root.querySelector<HTMLElement>('[data-grid]')!;
-  const empty = root.querySelector<HTMLElement>('[data-empty]')!;
-  const offline = root.querySelector<HTMLElement>('[data-offline]')!;
-  const status = root.querySelector<HTMLElement>('[data-status]')!;
-  const statusText = root.querySelector<HTMLElement>('[data-status-text]')!;
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const $ = <T extends HTMLElement = HTMLElement>(sel: string) => root.querySelector<T>(sel)!;
 
-  const cards = new Map<string, Card>();
+  const card = $('[data-bot]');
+  const grid = $('[data-grid]');
+
+  let snapshot: LiveSnapshot | null = null;
   let receivedAt = performance.now();
-  let hasData = false;
+  let status: LiveEventDetail['status'] = 'connecting';
+  let trackKey = '';
+  let shownSecond = -1;
   let offlineTimer: number | undefined;
   let visible = false;
   let running = false;
 
-  const setState = (state: 'connecting' | 'live' | 'reconnecting' | 'offline', text: string) => {
-    status.dataset.state = state;
-    statusText.textContent = text;
-  };
+  const broadcast = () =>
+    window.dispatchEvent(new CustomEvent<LiveEventDetail>('raya:live', { detail: { status, snapshot, receivedAt } }));
 
-  function buildCard(player: LivePlayer): Card {
-    const card = el('article', 'live-card');
-    card.dataset.id = player.id;
+  // ---------- Bot card ----------
 
+  function renderBot() {
+    const bot = snapshot?.bot ?? null;
+    const now = snapshot?.nowPlaying ?? null;
+    card.dataset.state = status === 'live' ? (now ? (now.paused ? 'paused' : 'playing') : 'idle') : status;
+
+    if (snapshot) {
+      card.classList.remove('is-loading');
+      const name = bot?.name ?? 'Live feed';
+      $('[data-bot-name]').textContent = name;
+      const avatar = $('[data-avatar]');
+      avatar.style.setProperty('--h', String(hue(name)));
+      avatar.dataset.initial = name.charAt(0).toUpperCase();
+      setImage(avatar, safeUrl(bot?.avatar), 'avatar-img');
+      const invite = $<HTMLAnchorElement>('[data-invite]');
+      const inviteUrl = safeUrl(bot?.url);
+      invite.hidden = !inviteUrl;
+      if (inviteUrl) invite.href = inviteUrl;
+    }
+    updateStatusText();
+
+    $('[data-offline]').hidden = !(status === 'offline' && !snapshot);
+    $('[data-idle]').hidden = !(snapshot && !now && status !== 'offline');
+    $('[data-track]').hidden = !now;
+    if (!now) {
+      trackKey = '';
+      return;
+    }
+
+    const key = `${now.track.title}${now.track.uri}`;
+    if (key !== trackKey) {
+      const changed = trackKey !== '';
+      trackKey = key;
+      const title = $<HTMLAnchorElement>('[data-title]');
+      title.textContent = now.track.title;
+      const href = safeUrl(now.track.uri);
+      if (href) title.href = href;
+      else title.removeAttribute('href');
+      $('[data-author]').textContent = now.track.author;
+      const source = $('[data-source]');
+      source.textContent = sourceName(now.track.source);
+      source.className = `badge source src-${sourceKey(now.track.source)}`;
+
+      const cover = $('[data-cover]');
+      cover.style.setProperty('--h', String(hue(now.track.title)));
+      $('[data-cover-fallback]').textContent = now.track.title.trim().charAt(0).toUpperCase() || '♪';
+      const artwork = safeUrl(now.track.artworkUrl);
+      setImage(cover, artwork, 'cover-img');
+      setImage($('[data-backdrop]'), artwork, 'backdrop-img');
+
+      if (changed && !reduceMotion) {
+        card.classList.remove('swap');
+        void card.offsetWidth;
+        card.classList.add('swap');
+      }
+    }
+    $('[data-label]').textContent = now.paused ? 'Paused' : 'Now playing';
+    shownSecond = -1;
+    tick();
+  }
+
+  function updateStatusText() {
+    const text = $('[data-bot-status]');
+    if (status === 'live' && snapshot) {
+      const uptime = snapshot.bot ? ` · up ${fmtUptime(snapshot.bot.uptime + (performance.now() - receivedAt))}` : '';
+      text.textContent = `Online${uptime}`;
+    } else if (status === 'offline') {
+      text.textContent = 'Offline';
+    } else if (status === 'reconnecting') {
+      text.textContent = 'Reconnecting…';
+    } else {
+      text.textContent = 'Connecting…';
+    }
+  }
+
+  // ---------- Optional server cards ----------
+
+  const cards = new Map<string, { el: HTMLElement; data: LivePlayer; key: string; second: number }>();
+
+  function buildServerCard(player: LivePlayer) {
+    const node = el('article', 'live-card');
     const art = el('div', 'art');
-    const fallback = el('span', 'art-fallback');
-    art.append(fallback);
-    const bars = el('span', 'bars');
-    bars.setAttribute('aria-hidden', 'true');
-    for (let i = 0; i < 4; i++) bars.append(el('i'));
-    art.append(bars);
-
+    art.append(el('span', 'art-fallback'));
     const body = el('div', 'body');
     const title = el('a', 'title');
     title.target = '_blank';
     title.rel = 'noopener noreferrer';
-    const author = el('span', 'author');
     const server = el('div', 'server');
-    const icon = el('span', 'icon');
-    const serverName = el('span', 'server-name');
-    server.append(icon, serverName);
+    server.append(el('span', 'icon'), el('span', 'server-name'));
     const progress = el('div', 'progress');
     progress.append(el('i', 'fill'));
     const meta = el('div', 'meta');
-    const time = el('span', 'time');
-    const badges = el('span', 'badges');
-    meta.append(time, badges);
-    body.append(title, author, server, progress, meta);
-    card.append(art, body);
-
-    const entry: Card = { el: card, data: player, trackKey: '', shownSecond: -1 };
-    updateCard(entry, player, true);
-    return entry;
+    meta.append(el('span', 'time'), el('span', 'badges'));
+    body.append(title, el('span', 'author'), server, progress, meta);
+    node.append(art, body);
+    return { el: node, data: player, key: '', second: -1 };
   }
 
-  function updateCard(card: Card, player: LivePlayer, initial = false) {
-    const root = card.el;
-    const trackKey = `${player.track.title}${player.track.uri}`;
-    const trackChanged = trackKey !== card.trackKey;
-    card.data = player;
-    card.shownSecond = -1;
-    root.classList.toggle('is-paused', player.paused);
-
-    if (trackChanged) {
-      card.trackKey = trackKey;
-      const title = root.querySelector<HTMLAnchorElement>('.title')!;
+  function updateServerCard(entry: ReturnType<typeof buildServerCard>, player: LivePlayer) {
+    const node = entry.el;
+    entry.data = player;
+    entry.second = -1;
+    node.classList.toggle('is-paused', player.paused);
+    const key = `${player.track.title}${player.track.uri}`;
+    if (key !== entry.key) {
+      entry.key = key;
+      const title = node.querySelector<HTMLAnchorElement>('.title')!;
       title.textContent = player.track.title;
       const href = safeUrl(player.track.uri);
       if (href) title.href = href;
       else title.removeAttribute('href');
-      root.querySelector('.author')!.textContent = player.track.author;
-
-      const art = root.querySelector<HTMLElement>('.art')!;
+      node.querySelector('.author')!.textContent = player.track.author;
+      const art = node.querySelector<HTMLElement>('.art')!;
       art.style.setProperty('--h', String(hue(player.track.title)));
-      art.querySelector('img')?.remove();
-      const fallback = art.querySelector<HTMLElement>('.art-fallback')!;
-      fallback.textContent = player.track.title.trim().charAt(0).toUpperCase() || '♪';
-      const artwork = safeUrl(player.track.artworkUrl);
-      if (artwork) {
-        const img = el('img');
-        img.alt = '';
-        img.loading = 'lazy';
-        img.decoding = 'async';
-        img.referrerPolicy = 'no-referrer';
-        img.addEventListener('error', () => img.remove());
-        img.src = artwork;
-        art.prepend(img);
-      }
-      if (!initial && !reduceMotion) {
-        root.classList.remove('swap');
-        void root.offsetWidth;
-        root.classList.add('swap');
-      }
+      art.querySelector('.art-fallback')!.textContent = player.track.title.charAt(0).toUpperCase() || '♪';
+      setImage(art, safeUrl(player.track.artworkUrl), 'art-img');
     }
-
-    const icon = root.querySelector<HTMLElement>('.icon')!;
-    const iconUrl = safeUrl(player.server.icon);
-    if (icon.dataset.src !== (iconUrl ?? '')) {
-      icon.dataset.src = iconUrl ?? '';
-      icon.textContent = '';
-      icon.style.setProperty('--h', String(hue(player.server.name)));
-      if (iconUrl) {
-        const img = el('img');
-        img.alt = '';
-        img.referrerPolicy = 'no-referrer';
-        img.addEventListener('error', () => {
-          img.remove();
-          icon.textContent = player.server.name.charAt(0).toUpperCase();
-        });
-        img.src = iconUrl;
-        icon.append(img);
-      } else {
-        icon.textContent = player.server.name.charAt(0).toUpperCase();
-      }
-    }
-    root.querySelector('.server-name')!.textContent = player.server.name;
-
-    const badges = root.querySelector<HTMLElement>('.badges')!;
-    badges.replaceChildren();
-    const sourceKey = player.track.source.toLowerCase().replace(/[^a-z0-9]/g, '');
-    const source = el('span', `badge source src-${sourceKey}`, SOURCE_NAMES[sourceKey] ?? player.track.source);
-    badges.append(source);
+    const icon = node.querySelector<HTMLElement>('.icon')!;
+    icon.style.setProperty('--h', String(hue(player.server.name)));
+    icon.textContent = player.server.icon ? '' : player.server.name.charAt(0).toUpperCase();
+    setImage(icon, safeUrl(player.server.icon), 'icon-img');
+    node.querySelector('.server-name')!.textContent = player.server.name;
+    const badges = node.querySelector<HTMLElement>('.badges')!;
+    badges.replaceChildren(el('span', `badge source src-${sourceKey(player.track.source)}`, sourceName(player.track.source)));
     if (player.paused) badges.append(el('span', 'badge paused', 'Paused'));
-    if (player.loop !== 'off') badges.append(el('span', 'badge', player.loop === 'track' ? 'Loop track' : 'Loop queue'));
     if (player.queueSize > 0) badges.append(el('span', 'badge', `+${player.queueSize} queued`));
-    root.setAttribute('aria-label', `${player.server.name} is ${player.paused ? 'paused on' : 'playing'} ${player.track.title} by ${player.track.author}`);
   }
 
-  function render(snapshot: LiveSnapshot) {
-    receivedAt = performance.now();
-    hasData = true;
-    offline.hidden = true;
-    const players = Array.isArray(snapshot.players) ? snapshot.players : [];
+  function renderServers() {
+    const players = snapshot?.players ?? [];
     const seen = new Set<string>();
-
     players.forEach((player, index) => {
       seen.add(player.id);
-      let card = cards.get(player.id);
-      if (!card) {
-        card = buildCard(player);
-        cards.set(player.id, card);
-        if (!reduceMotion) card.el.classList.add('enter');
-      } else {
-        updateCard(card, player);
+      let entry = cards.get(player.id);
+      if (!entry) {
+        entry = buildServerCard(player);
+        cards.set(player.id, entry);
+        if (!reduceMotion) entry.el.classList.add('enter');
       }
-      const current = grid.children[index];
-      if (current !== card.el) grid.insertBefore(card.el, current ?? null);
+      updateServerCard(entry, player);
+      if (grid.children[index] !== entry.el) grid.insertBefore(entry.el, grid.children[index] ?? null);
     });
-
-    for (const [id, card] of cards) {
+    for (const [id, entry] of cards) {
       if (seen.has(id)) continue;
       cards.delete(id);
-      if (reduceMotion) card.el.remove();
-      else {
-        card.el.classList.add('leave');
-        card.el.addEventListener('animationend', () => card.el.remove(), { once: true });
-        setTimeout(() => card.el.remove(), 600);
-      }
+      entry.el.remove();
     }
-
-    empty.hidden = players.length > 0;
-    const servers = players.length === 1 ? '1 server' : `${players.length} servers`;
-    const total = snapshot.totals && snapshot.totals.playing > players.length ? ` · ${snapshot.totals.playing} playing in total` : '';
-    setState('live', players.length ? `Live · ${servers} playing${total}` : `Live${total}`);
-    tick();
+    grid.hidden = players.length === 0;
   }
+
+  // ---------- Clock ----------
 
   function tick() {
     const now = performance.now();
-    for (const card of cards.values()) {
-      const { position, paused, speed, track } = card.data;
-      const elapsed = paused ? 0 : (now - receivedAt) * (speed || 1);
-      const current = track.isStream ? position + elapsed : Math.min(track.duration, position + elapsed);
-      const second = Math.floor(current / 1000);
-      if (second === card.shownSecond) continue;
-      card.shownSecond = second;
-      const fill = card.el.querySelector<HTMLElement>('.fill')!;
-      const timeEl = card.el.querySelector<HTMLElement>('.time')!;
-      if (track.isStream) {
-        fill.style.width = '100%';
-        timeEl.textContent = `LIVE · ${fmt(current)}`;
-      } else {
-        fill.style.width = `${track.duration ? Math.min(100, (current / track.duration) * 100) : 0}%`;
-        timeEl.textContent = `${fmt(current)} / ${fmt(track.duration)}`;
+    const current = snapshot?.nowPlaying;
+    if (current) {
+      const position = livePosition(current, receivedAt, now);
+      const second = Math.floor(position / 1000);
+      if (second !== shownSecond) {
+        shownSecond = second;
+        $('[data-fill]').style.width = current.track.isStream ? '100%' : `${Math.min(100, (position / (current.track.duration || 1)) * 100)}%`;
+        $('[data-time]').textContent = current.track.isStream ? `LIVE · ${fmt(position)}` : `${fmt(position)} / ${fmt(current.track.duration)}`;
+        if (second % 30 === 0) updateStatusText();
       }
+    }
+    for (const entry of cards.values()) {
+      const position = livePosition(entry.data, receivedAt, now);
+      const second = Math.floor(position / 1000);
+      if (second === entry.second) continue;
+      entry.second = second;
+      const { track } = entry.data;
+      entry.el.querySelector<HTMLElement>('.fill')!.style.width = track.isStream ? '100%' : `${Math.min(100, (position / (track.duration || 1)) * 100)}%`;
+      entry.el.querySelector('.time')!.textContent = track.isStream ? `LIVE · ${fmt(position)}` : `${fmt(position)} / ${fmt(track.duration)}`;
     }
   }
 
@@ -265,33 +323,42 @@ export function mountLiveFeed(root: HTMLElement): void {
     }
   }).observe(root);
 
+  const setStatus = (next: LiveEventDetail['status']) => {
+    status = next;
+    renderBot();
+    broadcast();
+  };
+
+  // ---------- Connection ----------
+
   if (!('EventSource' in window)) {
-    setState('offline', 'Your browser does not support live updates');
+    setStatus('offline');
     return;
   }
 
   const source = new EventSource(`${url}/stream`);
   source.addEventListener('snapshot', (event) => {
     try {
-      render(JSON.parse((event as MessageEvent<string>).data) as LiveSnapshot);
+      snapshot = JSON.parse((event as MessageEvent<string>).data) as LiveSnapshot;
     } catch {
-      /* ignore malformed messages */
+      return;
     }
-  });
-  source.addEventListener('open', () => {
+    receivedAt = performance.now();
     clearTimeout(offlineTimer);
     offlineTimer = undefined;
+    status = 'live';
+    renderServers();
+    renderBot();
+    broadcast();
   });
   source.addEventListener('error', () => {
-    setState('reconnecting', hasData ? 'Reconnecting…' : 'Connecting to the bot…');
+    setStatus(snapshot ? 'reconnecting' : 'connecting');
     if (offlineTimer === undefined) {
       offlineTimer = window.setTimeout(() => {
-        if (source.readyState === EventSource.OPEN) return;
-        setState('offline', 'Bot offline');
-        if (!hasData) offline.hidden = false;
-        root.classList.add('is-offline');
+        offlineTimer = undefined;
+        if (source.readyState !== EventSource.OPEN) setStatus('offline');
       }, 8000);
     }
   });
-  source.addEventListener('snapshot', () => root.classList.remove('is-offline'));
+  broadcast();
 }

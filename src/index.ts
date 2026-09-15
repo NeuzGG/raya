@@ -13,7 +13,15 @@ export { defaultAutoplay, relatedQueries } from './player/autoplay';
 export { VoiceStatus, MAX_VOICE_STATUS_LENGTH } from './plugins/VoiceStatus';
 export type { VoiceStatusOptions, VoiceStatusTemplate } from './plugins/VoiceStatus';
 export { NowPlayingFeed } from './plugins/NowPlayingFeed';
-export type { NowPlayingFeedOptions, LiveServerInfo, LiveTrack, LivePlayer, LiveSnapshot } from './plugins/NowPlayingFeed';
+export type {
+  NowPlayingFeedOptions,
+  LiveBotInfo,
+  LiveServerInfo,
+  LiveTrack,
+  LiveNowPlaying,
+  LivePlayer,
+  LiveSnapshot,
+} from './plugins/NowPlayingFeed';
 
 export { Connectors, DiscordJSConnector, ErisConnector, OceanicConnector } from './connectors';
 export type { DiscordJSClientLike, ErisClientLike, OceanicClientLike } from './connectors';

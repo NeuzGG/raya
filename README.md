@@ -18,7 +18,7 @@ Fast, resilient and easy to use: players that survive bot restarts, dead nodes a
 [Quick start](https://neuzgg.github.io/raya/getting-started/quick-start/) ·
 [Live demo](https://neuzgg.github.io/raya/#demo) ·
 [Config Builder](https://neuzgg.github.io/raya/tools/config-builder/) ·
-[Example bot](examples/discordjs-bot.js)
+[Official bot](bot/)
 
 </div>
 
@@ -37,7 +37,7 @@ await player.enqueue(await player.search('never gonna give you up', { requester:
 | 🛟 **Self-healing** | v4 session resuming, rebuilds after a Lavalink restart, automatic failover between nodes, and voice reconnects after Discord voice errors. |
 | ⚡ **Fast by design** | Changes made in the same tick become one request. Tracks decode locally, searches are cached and de-duplicated, and node balancing is load-aware. |
 | 🎶 **Smart autoplay** | YouTube mixes, LavaSrc recommendations, then more from the same artist. Works with Spotify even without Extended quota. |
-| 📡 **Live now playing** | Stream what your bot is playing to your website in real time, for servers that opt in. |
+| 📡 **Live now playing** | Connect your bot to your website: show its avatar, status and the song it's playing, in real time. |
 | 🏷️ **Voice channel status** | Shows "Now playing" on the voice channel and cleans it up when playback ends. |
 | 🧩 **Any Discord library** | Connectors for discord.js, Eris and Oceanic, or plug in anything with a `send` function. |
 | 🧠 **Typed end to end** | Typed events, a typed requester through declaration merging, and errors with stable codes. |
@@ -132,22 +132,26 @@ const restore = fs.existsSync('raya-snapshot.json')
 const raya = new Raya({ nodes, connector, restore });
 ```
 
-### Show what's playing on your website
+### Show what your bot is playing on your website
 
 ```js
 const { NowPlayingFeed } = require('raya.js');
 
-const PUBLIC_SERVERS = new Set(['123456789012345678']); // servers that opted in
-
 await raya.use(new NowPlayingFeed({
   port: 8787,
-  publish: (guildId) => {
-    const guild = PUBLIC_SERVERS.has(guildId) && client.guilds.cache.get(guildId);
-    return guild ? { name: guild.name, icon: guild.iconURL() } : null; // null = private
-  },
+  bot: () => ({ name: client.user?.username, avatar: client.user?.displayAvatarURL() }),
 }));
 // GET /now-playing (JSON) and /now-playing/stream (live updates)
+// Only the song is shared: no server names or usernames.
 ```
+
+## Official bot
+
+[**Raya Bot**](bot/) is a complete music bot built with raya.js and discord.js display components:
+- one live player per server, with buttons for playback, loop, autoplay, sound, queue and lyrics
+- search suggestions, restart-proof players, and a live now-playing feed for the website
+
+Run it yourself or use it as a starting point. See [`bot/README.md`](bot/README.md). For something smaller, there's also a [minimal example](examples/discordjs-bot.js).
 
 ## Documentation
 

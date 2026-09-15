@@ -5,6 +5,7 @@ build/
 .claude/
 *.tgz
 raya-snapshot.json
+bot/data/
 .env
 .env.*
 !.env.example

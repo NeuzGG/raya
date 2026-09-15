@@ -1,0 +1,83 @@
+---
+title: Official bot
+description: Raya Bot, the official music bot built with raya.js and Discord display components. Run it yourself or use it as a starting point.
+---
+
+import { Steps, Aside, CardGrid, Card } from '@astrojs/starlight/components';
+
+**Raya Bot** is the official music bot for raya.js. It's a complete, production-ready bot you can run as it is, or read to see how the pieces fit together. The source is in the [`bot/` folder on GitHub](https://github.com/neuzgg/raya/tree/main/bot).
+
+<CardGrid>
+  <Card title="One live player" icon="seti:audio">
+    A single message per server shows the song, a countdown to the end and what's up next. When a new song starts, the player moves to the bottom of the chat.
+  </Card>
+  <Card title="Buttons for everything" icon="puzzle">
+    Previous, pause, skip, shuffle, stop, loop, autoplay, a sound board with volume and filters, the queue and lyrics.
+  </Card>
+  <Card title="Clean cards" icon="document">
+    Built with discord.js display components: text and dividers only, no header, no accent color.
+  </Card>
+  <Card title="Live on the website" icon="rocket">
+    The bot shares the song it's playing with this site through `NowPlayingFeed`, with an Add to Discord button.
+  </Card>
+</CardGrid>
+
+## Commands
+
+| Command | What it does |
+| --- | --- |
+| `/play query [next]` | Play a song, playlist or link, with suggestions as you type |
+| `/nowplaying` | Bring the player to the bottom of the chat |
+| `/pause` · `/resume` | Pause or resume |
+| `/skip [to]` · `/previous` | Skip, jump to a song in the queue, or go back |
+| `/seek time` | `1:30`, `90`, `2m`, `+10` or `-10` |
+| `/queue` · `/remove` · `/move` · `/shuffle` | Manage the queue |
+| `/loop [mode]` · `/autoplay` | Loop the song or queue, keep playing related songs |
+| `/volume [level]` · `/filters [preset]` | Volume (0-200), bass boost, nightcore, 8D and more |
+| `/lyrics` | Lyrics of the current song (needs LavaLyrics) |
+| `/stop` · `/help` | Stop and leave, or show help |
+
+Only people in the bot's voice channel, or members who can manage the server, can control the music. Anyone can look at the queue.
+
+## Run it yourself
+
+You need Node.js 20.12+ and a [Lavalink v4 server](../installation/).
+
+<Steps>
+
+1. Clone the repository, build raya.js and install the bot:
+
+   ```bash
+   git clone https://github.com/neuzgg/raya.git
+   cd raya
+   npm install && npm run build
+   cd bot && npm install
+   ```
+
+2. Create an application in the [Discord Developer Portal](https://discord.com/developers/applications) and copy the bot token. No privileged intents are needed.
+
+3. Copy `bot/.env.example` to `bot/.env` and fill in `DISCORD_TOKEN` and your Lavalink details.
+
+   <Aside type="caution">`bot/.env` is gitignored. Never put your token in `.env.example` or any other file you commit.</Aside>
+
+4. Register the slash commands and start the bot. It prints an invite link:
+
+   ```bash
+   npm run deploy
+   npm start
+   ```
+
+</Steps>
+
+To restart without stopping the music, press `Ctrl+C` and start the bot again within a minute. Players are saved and picked up automatically ([how restarts work](../../guides/restarts/)).
+
+## Show it on the website
+
+Set `LIVE_FEED_PORT=8787` in `bot/.env`. The bot then serves its live status at `http://localhost:8787/now-playing`. Put that on a public HTTPS address, set the `LIVE_FEED_URL` repository variable, and redeploy the site. The [live now playing guide](../../guides/live-now-playing/) walks through each step.
+
+## Make it yours
+
+- **Emojis** are in `src/ui/emojis.js`. Swap in your own application emojis as `<:name:id>`.
+- **Every message** is built with one `card()` helper in `src/ui/components.js`, so the look stays consistent.
+- **The player** lives in `src/ui/panel.js`, and `src/music/panels.js` keeps one live player message per server.
+- **Tests** check every card against the design rules and run full `/play` → button flows against a Lavalink simulator: `npm test`.

@@ -34,6 +34,7 @@ export default defineConfig({
             'getting-started/installation',
             'getting-started/quick-start',
             'getting-started/connectors',
+            { slug: 'getting-started/official-bot', badge: { text: 'New', variant: 'success' } },
           ],
         },
         {

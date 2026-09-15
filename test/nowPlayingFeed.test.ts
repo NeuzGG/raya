@@ -155,7 +155,72 @@ describe('NowPlayingFeed', () => {
     assert.equal(snapshot.players[0]!.server.name.length, 200);
   });
 
-  it('requires a publish function', () => {
+  it('requires bot and/or publish', () => {
     assert.throws(() => new NowPlayingFeed({} as NowPlayingFeedOptions), TypeError);
+    assert.throws(() => new NowPlayingFeed({ publish: 'nope' } as unknown as NowPlayingFeedOptions), TypeError);
+    assert.doesNotThrow(() => new NowPlayingFeed({ bot: { name: 'Raya' } }));
+  });
+
+  describe('bot mode', () => {
+    const bot = { name: 'Raya', avatar: 'https://cdn.discordapp.com/avatars/1/abc.png', url: 'https://discord.com/oauth2/authorize?client_id=1' };
+
+    it("shares the bot and its current song without any server information", async () => {
+      const { h, feed } = await setup({ publish: undefined, bot });
+      await playIn(h, GUILD_ID, 'bot song');
+
+      const text = await (await fetch(feed.url!)).text();
+      const snapshot = JSON.parse(text) as LiveSnapshot;
+      assert.deepEqual({ ...snapshot.bot, uptime: undefined }, { ...bot, uptime: undefined });
+      assert.ok(snapshot.bot!.uptime > 0);
+      assert.equal(snapshot.nowPlaying!.track.title, 'bot song 1');
+      assert.equal(snapshot.nowPlaying!.paused, false);
+      assert.deepEqual(snapshot.players, [], 'no server cards without publish');
+      assert.ok(!text.includes(GUILD_ID) && !text.includes('Lofi Lounge'), 'no server id or name');
+      assert.ok(!text.includes('secret-user') && !text.includes(USER_ID), 'no requesters');
+    });
+
+    it('keeps showing the same song while it plays instead of jumping between servers', async () => {
+      const { h, feed } = await setup({ publish: undefined, bot });
+      const title = async () => ((await (await fetch(feed.url!)).json()) as LiveSnapshot).nowPlaying?.track.title;
+      const first = await playIn(h, GUILD_ID, 'first server song');
+      assert.equal(await title(), 'first server song 1', 'the only song is shown');
+
+      await playIn(h, PRIVATE_GUILD, 'second server song');
+      await new Promise((resolve) => setTimeout(resolve, 250)); // let the second trackStart arrive
+      assert.equal(await title(), 'first server song 1', 'sticky while playing');
+      await first.pause();
+      assert.equal(await title(), 'second server song 1', 'switches when the shown song pauses');
+      await h.raya.getPlayer(PRIVATE_GUILD)!.stop();
+      assert.equal(await title(), 'first server song 1', 'falls back to a paused song');
+      await first.stop();
+      assert.equal(await title(), undefined, 'nothing playing');
+    });
+
+    it('lets you leave servers out of the shared song', async () => {
+      const { h, feed } = await setup({ publish: undefined, bot: () => bot, nowPlaying: (guildId) => guildId !== PRIVATE_GUILD });
+      await playIn(h, PRIVATE_GUILD, 'excluded song');
+      let snapshot = (await (await fetch(feed.url!)).json()) as LiveSnapshot;
+      assert.equal(snapshot.nowPlaying, null);
+      assert.equal(snapshot.bot!.name, 'Raya');
+      await playIn(h, GUILD_ID, 'included song');
+      snapshot = (await (await fetch(feed.url!)).json()) as LiveSnapshot;
+      assert.equal(snapshot.nowPlaying!.track.title, 'included song 1');
+    });
+
+    it('streams song changes and pauses', async () => {
+      const { h, feed } = await setup({ publish: undefined, bot });
+      const stream = await openStream(`${feed.url}/stream`);
+      cleanups.push(stream.close);
+      await waitFor(() => stream.snapshots.length >= 1);
+      assert.equal(stream.snapshots[0]!.nowPlaying, null);
+      assert.equal(stream.snapshots[0]!.bot!.name, 'Raya');
+
+      const player = await playIn(h, GUILD_ID, 'stream song');
+      await waitFor(() => stream.snapshots.at(-1)?.nowPlaying?.track.title === 'stream song 1', 2000, 'song appears');
+      await player.pause();
+      await waitFor(() => stream.snapshots.at(-1)?.nowPlaying?.paused === true, 2000, 'pause pushed');
+      await player.skip();
+      await waitFor(() => stream.snapshots.at(-1)?.nowPlaying === null, 2000, 'cleared when the queue ends');
+    });
   });
 });
