@@ -83,32 +83,37 @@ export function renderPanel(player, options = {}) {
       `**${trackLink(track, 80)}**\n${trackAuthor(track, 60)}\n${stateLine(player, now, options)}`,
       details.map((line) => `-# ${line}`).join('\n'),
     ],
-    [
-      row(
-        button('player:previous', { emoji: emojis.previous, disabled: player.queue.history.length === 0 }),
-        button('player:toggle', { emoji: player.paused ? emojis.resume : emojis.pause, style: ButtonStyle.Primary }),
-        button('player:skip', { emoji: emojis.skip }),
-        button('player:shuffle', { emoji: emojis.shuffle, disabled: player.queue.size < 2 }),
-        button('player:stop', { emoji: emojis.stop, style: ButtonStyle.Danger }),
-      ),
-      row(
-        button('player:loop', {
-          emoji: player.loop === 'track' ? emojis.loopTrack : emojis.loop,
-          label: LOOP_LABELS[player.loop],
-          style: player.loop === 'off' ? ButtonStyle.Secondary : ButtonStyle.Primary,
-        }),
-        button('player:autoplay', {
-          emoji: emojis.autoplay,
-          label: 'Autoplay',
-          style: player.autoplay ? ButtonStyle.Primary : ButtonStyle.Secondary,
-        }),
-        button('player:sound', { emoji: emojis.sound, label: 'Sound' }),
-        button('player:queue', { emoji: emojis.queue, label: player.queue.size > 0 ? `Queue · ${player.queue.size}` : 'Queue' }),
-        hasLyrics(player) && button('player:lyrics', { emoji: emojis.lyrics, label: 'Lyrics' }),
-      ),
-    ],
+    playerRows(player),
     { thumbnail: { url: artwork(track), description: `Cover art for ${track.info.title}` } },
   );
+}
+
+/** The two rows of controls under the player, shared with the song request dashboard. */
+export function playerRows(player) {
+  return [
+    row(
+      button('player:previous', { emoji: emojis.previous, disabled: player.queue.history.length === 0 }),
+      button('player:toggle', { emoji: player.paused ? emojis.resume : emojis.pause, style: ButtonStyle.Primary }),
+      button('player:skip', { emoji: emojis.skip }),
+      button('player:shuffle', { emoji: emojis.shuffle, disabled: player.queue.size < 2 }),
+      button('player:stop', { emoji: emojis.stop, style: ButtonStyle.Danger }),
+    ),
+    row(
+      button('player:loop', {
+        emoji: player.loop === 'track' ? emojis.loopTrack : emojis.loop,
+        label: LOOP_LABELS[player.loop],
+        style: player.loop === 'off' ? ButtonStyle.Secondary : ButtonStyle.Primary,
+      }),
+      button('player:autoplay', {
+        emoji: emojis.autoplay,
+        label: 'Autoplay',
+        style: player.autoplay ? ButtonStyle.Primary : ButtonStyle.Secondary,
+      }),
+      button('player:sound', { emoji: emojis.sound, label: 'Sound' }),
+      button('player:queue', { emoji: emojis.queue, label: player.queue.size > 0 ? `Queue · ${player.queue.size}` : 'Queue' }),
+      hasLyrics(player) && button('player:lyrics', { emoji: emojis.lyrics, label: 'Lyrics' }),
+    ),
+  ];
 }
 
 /** Shown when the queue runs out while the bot stays in the channel. */

@@ -35,7 +35,7 @@ export const HELP = {
   stats: { category: 'info', summary: 'Bot, player and music server numbers' },
   help: { category: 'info', summary: 'This menu' },
 
-  setup: { category: 'admin', usage: 'create | status | disable', summary: 'Create a music request channel with a live dashboard' },
+  setup: { category: 'admin', usage: 'create | status | disable | delete', summary: 'Create a song request channel with a live dashboard' },
   dj: { category: 'admin', usage: 'set | clear | show', summary: 'Choose who can skip, stop and change the sound' },
   reset: { category: 'admin', summary: 'Force the player to stop and leave' },
   summon: { category: 'admin', summary: 'Move the bot to your voice channel' },
@@ -46,9 +46,16 @@ export function visibleCategories(isAdmin) {
   return CATEGORIES.filter((category) => !category.adminOnly || isAdmin);
 }
 
+/** The default view of /help: how many commands there are, and where they live. */
+export const EVERYTHING = { id: 'all', label: 'Overview', emoji: '📖', description: 'How many commands there are, and where' };
+
+/** What the /help dropdown offers: everything first, then one entry per category. */
+export function dropdownCategories(isAdmin) {
+  return [EVERYTHING, ...visibleCategories(isAdmin)];
+}
+
 export function categoryById(id, isAdmin) {
-  const allowed = visibleCategories(isAdmin);
-  return allowed.find((category) => category.id === id) ?? allowed[0];
+  return visibleCategories(isAdmin).find((category) => category.id === id) ?? EVERYTHING;
 }
 
 /** The commands of one category, as the help card wants them. */
@@ -56,4 +63,17 @@ export function commandsIn(categoryId) {
   return Object.entries(HELP)
     .filter(([, entry]) => entry.category === categoryId)
     .map(([name, entry]) => ({ name, usage: entry.usage ?? null, summary: entry.summary }));
+}
+
+/** The commands to list: none for the overview, otherwise the chosen category. */
+export function helpSections(categoryId, isAdmin) {
+  const chosen = categoryById(categoryId, isAdmin);
+  if (chosen.id === EVERYTHING.id) return [];
+  return [{ category: chosen, commands: commandsIn(chosen.id) }];
+}
+
+/** How many commands there are in total, and per category. */
+export function helpOverview(isAdmin) {
+  const categories = visibleCategories(isAdmin).map((category) => ({ category, count: commandsIn(category.id).length }));
+  return { total: categories.reduce((sum, entry) => sum + entry.count, 0), categories };
 }

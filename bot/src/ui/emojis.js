@@ -11,6 +11,7 @@ export const emojis = {
   loopTrack: '🔂',
   autoplay: '♾️',
   queue: '📜',
+  commands: '📖',
   sound: '🎛️',
   lyrics: '🎤',
   volumeDown: '🔉',

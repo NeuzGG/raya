@@ -3,6 +3,8 @@ import {
   ButtonBuilder,
   ButtonStyle,
   ContainerBuilder,
+  MediaGalleryBuilder,
+  MediaGalleryItemBuilder,
   MessageFlags,
   SectionBuilder,
   SeparatorBuilder,
@@ -22,15 +24,27 @@ const NO_MENTIONS = { parse: [] };
  * No accent color and no header: the first block is the content itself. With `thumbnail`
  * that first block becomes a section with the cover art beside it.
  *
+ * `image` puts a full-width picture under the first block instead, for the song request dashboard.
+ *
  * @param {Array<string | null | undefined | false>} blocks
  * @param {Array<ActionRowBuilder | null>} [rows]
- * @param {{ thumbnail?: { url?: string | null, description?: string } }} [options]
+ * @param {{ thumbnail?: { url?: string | null, description?: string }, image?: { url?: string | null, description?: string } }} [options]
  */
-export function card(blocks, rows = [], { thumbnail } = {}) {
+export function card(blocks, rows = [], { thumbnail, image } = {}) {
   const container = new ContainerBuilder();
-  const art = safeUrl(thumbnail?.url);
+  const banner = safeUrl(image?.url);
+  const art = banner ? null : safeUrl(thumbnail?.url);
   blocks.filter(Boolean).forEach((content, index) => {
     if (index > 0) container.addSeparatorComponents(divider());
+    if (index === 0 && banner) {
+      container.addTextDisplayComponents(new TextDisplayBuilder().setContent(content));
+      container.addMediaGalleryComponents(
+        new MediaGalleryBuilder().addItems(
+          new MediaGalleryItemBuilder().setURL(banner).setDescription(truncate(image.description || 'Cover art', 100)),
+        ),
+      );
+      return;
+    }
     if (index === 0 && art) {
       container.addSectionComponents(
         new SectionBuilder()

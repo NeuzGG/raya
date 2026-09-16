@@ -7,6 +7,7 @@ import { ButtonStyle } from 'discord.js';
 import { commands } from '../src/commands/index.js';
 import { createRouter } from '../src/interactions/router.js';
 import { Panels } from '../src/music/panels.js';
+import { attachSongRequests } from '../src/music/requests.js';
 import { MemorySettings } from '../src/music/settings.js';
 import { assertCard, buttonById, buttons, menu, text, thumbnail } from './helpers/cards.js';
 import { choose, click, createDiscord, GUILD_ID, OTHER_VOICE_ID, slash, STRANGER, TEXT_ID, USER, VOICE_ID } from './helpers/discord.js';
@@ -45,6 +46,7 @@ describe('bot flow', () => {
       panels: new Panels({ client: discord.client, raya: harness.raya, log: silent, settings }).attach(),
     };
     route = createRouter(bot, commands);
+    attachSongRequests(bot);
     discord.join(USER);
   });
 
@@ -226,7 +228,9 @@ describe('bot flow', () => {
     const content = text(message.payload);
     assert.ok(content.includes('**Raya** · music that never stops'));
     assert.ok(content.includes('The official Raya bot is here'), 'the announcement is shown');
-    assert.ok(content.includes('🎵 **Music**'));
+    assert.ok(content.includes(`**Raya has ${commands.length - 4} commands!**`), content);
+    assert.ok(content.includes('🎵 **Music** · 8 commands'));
+    assert.ok(!content.includes('`/play`'), 'the list waits behind the dropdown');
     assert.equal(thumbnail(message.payload).media.url, 'https://cdn.discordapp.com/avatars/1/abc.png');
     assert.deepEqual(
       buttons(message.payload).filter((control) => control.style === ButtonStyle.Link).map((link) => link.label),
@@ -235,7 +239,7 @@ describe('bot flow', () => {
 
     const dropdown = menu(message.payload);
     assert.equal(dropdown.custom_id, `help:${USER.id}`);
-    assert.deepEqual(dropdown.options.map((option) => option.value), ['music', 'queue', 'sound', 'info'], 'no admin category');
+    assert.deepEqual(dropdown.options.map((option) => option.value), ['all', 'music', 'queue', 'sound', 'info'], 'no admin category');
 
     await run(choose(discord, message, dropdown.custom_id, 'sound'));
     assert.ok(text(message.payload).includes('🎛️ **Sound**'), 'the same message switched category');
@@ -284,8 +288,8 @@ describe('bot flow', () => {
     const home = discord.channel(setup.textChannelId);
     const dashboard = home.store.get(setup.messageId);
     assertCard(dashboard.payload);
-    assert.ok(text(dashboard.payload).includes('**Raya** is ready'));
-    assert.ok(text(dashboard.payload).includes(`<#${setup.voiceChannelId}>`), 'it points at the voice channel');
+    assert.ok(text(dashboard.payload).includes('**Raya** · nothing is playing'));
+    assert.ok(text(dashboard.payload).includes(`Join <#${setup.voiceChannelId}> and **send a song name or a link**`), 'it says how to play');
 
     // Music commands belong in the request channel now.
     const elsewhere = await run(slash(discord, 'play', { query: 'wrong room' }));
@@ -303,8 +307,69 @@ describe('bot flow', () => {
     );
 
     await run(slash(discord, 'stop', {}, { channelId: setup.textChannelId }));
-    await waitFor(() => text(dashboard.payload).includes('**Raya** is ready'), 3000, 'back to the idle dashboard');
+    await waitFor(() => text(dashboard.payload).includes('nothing is playing'), 3000, 'back to the idle dashboard');
     assert.equal(home.deleted.length, 0, 'the dashboard is never deleted');
+  });
+
+  it('plays whatever people type in the request channel', async () => {
+    await run(slash(discord, 'setup', {}, { subcommand: 'create', manager: true }));
+    const setup = bot.settings.setup(GUILD_ID);
+    const home = discord.channel(setup.textChannelId);
+    const dashboard = home.store.get(setup.messageId);
+
+    const request = await discord.request(setup.textChannelId, 'lofi beats');
+    await waitFor(() => player()?.current?.info.title === 'lofi beats 1', 3000, 'the request started playing');
+    assert.equal(request.deleted, true, 'the request itself is tidied away');
+    await waitFor(() => text(dashboard.payload).includes('lofi beats 1'), 3000, 'the dashboard became the player');
+    assert.ok(text(dashboard.payload).includes('**Up next**'), 'and shows what is next');
+
+    // A second request joins the queue and gets a short confirmation.
+    await discord.request(setup.textChannelId, 'second request');
+    await waitFor(() => player().queue.size === 1, 3000, 'queued');
+    const confirmations = home.visible.filter((message) => text(message.payload).includes('second request 1'));
+    assert.equal(confirmations.length, 1, confirmations.map((m) => text(m.payload)).join(' | '));
+
+    // Anywhere else, a message is just a message.
+    await discord.request(TEXT_ID, 'not a request');
+    assert.equal(player().queue.size, 1, 'nothing was added from another channel');
+    assert.equal(discord.text.visible.length, 0, 'and nothing was posted there');
+  });
+
+  it('deletes the channels it made, but only after a confirmation', async () => {
+    await run(slash(discord, 'setup', {}, { subcommand: 'create', manager: true }));
+    const setup = bot.settings.setup(GUILD_ID);
+
+    const cancelled = await run(slash(discord, 'setup', {}, { subcommand: 'delete', manager: true }));
+    assert.match(text(cancelled.replyMessage.payload), /Delete \*\*raya-requests\*\*/);
+    assert.ok(bot.settings.setup(GUILD_ID), 'asking does not delete anything');
+
+    await run(click(discord, cancelled.replyMessage, 'setup:keep', { manager: true }));
+    assert.ok(bot.settings.setup(GUILD_ID), 'cancel keeps the channels');
+    assert.ok(discord.channel(setup.textChannelId), 'and the channel itself');
+
+    const confirmed = await run(slash(discord, 'setup', {}, { subcommand: 'delete', manager: true }));
+    await run(click(discord, confirmed.replyMessage, 'setup:delete', { manager: true }));
+
+    assert.equal(bot.settings.setup(GUILD_ID), null, 'the setup is forgotten');
+    for (const id of [setup.textChannelId, setup.voiceChannelId, setup.categoryId]) {
+      assert.equal(discord.channel(id), undefined, `channel ${id} was deleted`);
+    }
+
+    // Music commands work anywhere again.
+    await run(slash(discord, 'play', { query: 'free again' }));
+    await waitFor(() => player()?.current?.info.title === 'free again 1', 3000, 'playing outside the old channel');
+  });
+
+  it('tells someone who is not in a voice channel what to do', async () => {
+    await run(slash(discord, 'setup', {}, { subcommand: 'create', manager: true }));
+    const setup = bot.settings.setup(GUILD_ID);
+    const home = discord.channel(setup.textChannelId);
+    discord.leave(USER);
+
+    await discord.request(setup.textChannelId, 'song without voice');
+    assert.equal(harness.raya.getPlayer(GUILD_ID), undefined, 'nothing started');
+    const notices = home.visible.filter((message) => text(message.payload).includes('join a voice channel first'));
+    assert.equal(notices.length, 1, home.visible.map((m) => text(m.payload)).join(' | '));
   });
 
   it('lets only DJs change the music once a DJ role is set', async () => {

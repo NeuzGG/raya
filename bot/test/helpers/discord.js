@@ -105,26 +105,64 @@ export function createDiscord() {
     else if (type === ChannelType.GuildCategory) channel = { id, name, type, guild };
     else channel = new FakeTextChannel(id, name);
     channel.parentId = parent;
+    channel.delete = async () => {
+      guild.channels.cache.delete(id);
+      return channel;
+    };
     guild.channels.cache.set(id, channel);
     return channel;
   };
+
+  const listeners = new Map();
+  const client = {
+    channels: { cache: guild.channels.cache },
+    guilds: { cache: new Collection([[GUILD_ID, guild]]) },
+    user: { id: '100000000000000001', displayName: 'Raya', displayAvatarURL: () => 'https://cdn.discordapp.com/avatars/1/abc.png' },
+    uptime: 7_200_000,
+    ws: { ping: 42 },
+    on(event, listener) {
+      listeners.set(event, [...(listeners.get(event) ?? []), listener]);
+      return client;
+    },
+    emit(event, ...args) {
+      return Promise.all((listeners.get(event) ?? []).map((listener) => listener(...args)));
+    },
+  };
+
+  guild.members.me.permissionsIn = () => ({ has: () => true });
 
   return {
     guild,
     text,
     channel: (id) => guild.channels.cache.get(id),
-    client: {
-      channels: { cache: guild.channels.cache },
-      guilds: { cache: new Collection([[GUILD_ID, guild]]) },
-      user: { id: '100000000000000001', displayName: 'Raya', displayAvatarURL: () => 'https://cdn.discordapp.com/avatars/1/abc.png' },
-      uptime: 7_200_000,
-      ws: { ping: 42 },
-    },
+    client,
     join(user, channel = guild.channels.cache.get(VOICE_ID)) {
       voiceStates.set(user.id, { user, channel });
     },
     leave(user) {
       voiceStates.delete(user.id);
+    },
+    /** Someone types in a channel, the way a song request arrives. */
+    async request(channelId, content, { user = USER } = {}) {
+      const channel = guild.channels.cache.get(channelId);
+      const message = {
+        id: snowflake(),
+        guildId: GUILD_ID,
+        guild,
+        channelId,
+        channel,
+        content,
+        author: user,
+        system: false,
+        attachments: new Collection(),
+        member: { voice: { channel: voiceStates.get(user.id)?.channel ?? null } },
+        deleted: false,
+        async delete() {
+          message.deleted = true;
+        },
+      };
+      await client.emit('messageCreate', message);
+      return message;
     },
   };
 }
@@ -223,6 +261,7 @@ export function click(discord, message, customId, context = {}) {
       interaction.replied = true;
       message.payload = payload;
       message.edits++;
+      interaction.replyMessage = message; // editReply() edits the same message afterwards
     },
     async deferUpdate() {
       if (interaction.deferred || interaction.replied) throw new Error('Interaction already acknowledged');

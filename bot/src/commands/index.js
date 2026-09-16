@@ -7,7 +7,7 @@ import queue from './queue.js';
 import setup from './setup.js';
 import sound from './sound.js';
 
-export { CATEGORIES, HELP, categoryById, commandsIn, visibleCategories } from './catalog.js';
+export { CATEGORIES, EVERYTHING, HELP, categoryById, commandsIn, dropdownCategories, helpOverview, helpSections, visibleCategories } from './catalog.js';
 
 export const commands = [...music, ...queue, ...sound, ...info, ...admin, ...setup];
 

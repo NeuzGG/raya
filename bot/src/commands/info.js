@@ -1,7 +1,7 @@
 import { MessageFlags, SlashCommandBuilder, version as discordVersion } from 'discord.js';
 import { VERSION } from 'raya.js';
 import { latestAnnouncement } from '../announcements.js';
-import { categoryById, commandsIn, visibleCategories } from './catalog.js';
+import { categoryById, dropdownCategories, helpOverview, helpSections } from './catalog.js';
 import { getPlayer, isManager, UserError } from '../music/guards.js';
 import { create, edit, notice } from '../ui/components.js';
 import { trackLink } from '../ui/format.js';
@@ -63,8 +63,9 @@ export function helpView(bot, { categoryId, isAdmin, viewerId }) {
     tagline: 'music that never stops',
     announcement: latestAnnouncement(bot.config.announcement),
     category,
-    categories: visibleCategories(isAdmin),
-    commands: commandsIn(category.id),
+    categories: dropdownCategories(isAdmin),
+    sections: helpSections(categoryId, isAdmin),
+    overview: helpOverview(isAdmin),
     stats: {
       servers: bot.client.guilds.cache.size,
       playing: bot.raya.stats.playingPlayers,
@@ -81,7 +82,7 @@ const help = {
   data: new SlashCommandBuilder().setName('help').setDescription('What Raya can do, and everything it can play'),
   async run({ interaction, bot }) {
     const view = helpView(bot, {
-      categoryId: 'music',
+      categoryId: 'all', // every command at once; the dropdown narrows it down
       isAdmin: isManager(interaction),
       viewerId: interaction.user.id,
     });

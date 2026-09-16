@@ -1,5 +1,5 @@
 import { create, edit, notice } from '../ui/components.js';
-import { renderDashboardIdle } from '../ui/dashboard.js';
+import { renderDashboard } from '../ui/dashboard.js';
 import { renderGoodbye, renderPanel, renderQueueEnd, renderTrackProblem } from '../ui/panel.js';
 
 const GONE = new Set([10003, 10008, 50001]); // Unknown Channel, Unknown Message, Missing Access
@@ -22,17 +22,21 @@ export class Panels {
   #raya;
   #log;
   #settings;
+  #links;
+  #songRequests;
   #options;
   #chains = new Map();
   #timers = new Map();
   #claims = new Map();
   #lastProblem = new Map();
 
-  constructor({ client, raya, log, settings = null, emptyLeaveDelay = 0, queueEndLeaveDelay = 0 }) {
+  constructor({ client, raya, log, settings = null, links = () => ({}), songRequests = true, emptyLeaveDelay = 0, queueEndLeaveDelay = 0 }) {
     this.#client = client;
     this.#raya = raya;
     this.#log = log;
     this.#settings = settings;
+    this.#links = links;
+    this.#songRequests = songRequests;
     this.#options = { emptyLeaveDelay, queueEndLeaveDelay };
   }
 
@@ -75,14 +79,17 @@ export class Panels {
       : renderQueueEnd(player, player.queue.previous ?? null, this.#options);
   }
 
-  /** The idle dashboard card for a server that ran /setup. */
-  renderIdle(guildId) {
-    const setup = this.#settings?.setup(guildId);
-    return renderDashboardIdle({
+  /** The song request dashboard of a server: the live player, or the idle card. */
+  renderDashboardCard(guildId, player = this.#raya.getPlayer(guildId)) {
+    return renderDashboard({
+      player: player && !player.destroyed ? player : null,
+      setup: this.#settings?.setup(guildId) ?? null,
       name: this.#client.user?.displayName ?? 'Raya',
-      avatar: this.#client.user?.displayAvatarURL?.({ extension: 'png', size: 128 }) ?? null,
-      voiceChannelId: setup?.voiceChannelId ?? null,
+      avatar: this.#client.user?.displayAvatarURL?.({ extension: 'png', size: 256 }) ?? null,
       djRoleId: this.#settings?.get(guildId)?.djRoleId ?? null,
+      links: this.#links() ?? {},
+      requests: this.#songRequests,
+      listeners: this.#listeners(player),
     });
   }
 
@@ -143,7 +150,7 @@ export class Panels {
   async repost(player, interaction) {
     const dashboard = this.#dashboard(player.guildId);
     if (dashboard) {
-      await this.#editMessage(dashboard, this.render(player));
+      await this.#editMessage(dashboard, this.renderDashboardCard(player.guildId, player));
       await interaction.reply(
         create(notice(`The player lives in <#${dashboard.channelId}>`, { note: 'It updates itself there.' }), { ephemeral: true }),
       );
@@ -165,8 +172,7 @@ export class Panels {
   async refreshDashboard(guildId) {
     const setup = this.#settings?.setup(guildId);
     if (!setup?.textChannelId) return null;
-    const player = this.#raya.getPlayer(guildId);
-    const container = player && !player.destroyed ? this.render(player) : this.renderIdle(guildId);
+    const container = this.renderDashboardCard(guildId);
     return this.#task(guildId, async () => {
       if (setup.messageId && (await this.#editMessage({ channelId: setup.textChannelId, messageId: setup.messageId }, container))) {
         return setup.messageId;
@@ -176,6 +182,13 @@ export class Panels {
   }
 
   // ==================== Internals ====================
+
+  /** How many people (not bots) are in the player's voice channel, when we can tell. */
+  #listeners(player) {
+    const channel = player?.voiceChannelId ? this.#client.channels.cache.get(player.voiceChannelId) : null;
+    if (!channel?.members) return null;
+    return [...channel.members.values()].filter((member) => !member.user?.bot).length;
+  }
 
   #dashboard(guildId) {
     const setup = this.#settings?.setup(guildId);
@@ -217,9 +230,9 @@ export class Panels {
 
     const dashboard = this.#dashboard(player.guildId);
     if (dashboard) {
-      if (await this.#editMessage(dashboard, render())) return;
-      const setup = this.#settings.setup(player.guildId);
-      await this.#createDashboard(player.guildId, setup, render());
+      const card = this.renderDashboardCard(player.guildId, player);
+      if (await this.#editMessage(dashboard, card)) return;
+      await this.#createDashboard(player.guildId, this.#settings.setup(player.guildId), card);
       return;
     }
 
@@ -254,14 +267,19 @@ export class Panels {
 
   async #update(player) {
     if (player.destroyed) return;
-    const target = this.#dashboard(player.guildId) ?? player.data.get('panel');
-    if (target) await this.#editMessage(target, this.render(player), player);
+    const dashboard = this.#dashboard(player.guildId);
+    if (dashboard) {
+      await this.#editMessage(dashboard, this.renderDashboardCard(player.guildId, player));
+      return;
+    }
+    const panel = player.data.get('panel');
+    if (panel) await this.#editMessage(panel, this.render(player), player);
   }
 
   async #finish(player, reason) {
     const dashboard = this.#dashboard(player.guildId);
     if (dashboard) {
-      await this.#editMessage(dashboard, this.renderIdle(player.guildId));
+      await this.#editMessage(dashboard, this.renderDashboardCard(player.guildId, null));
       return;
     }
     const panel = player.data.get('panel');

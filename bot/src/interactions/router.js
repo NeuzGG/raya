@@ -2,7 +2,7 @@ import { assertMusicChannel } from '../music/guards.js';
 import { create, edit, notice } from '../ui/components.js';
 import { handleButton } from './buttons.js';
 import { handleSelect } from './selects.js';
-import { describeError, isUnexpected } from './errors.js';
+import { describeError, isExpiredInteraction, isUnexpected } from './errors.js';
 
 const MUSIC_CATEGORIES = new Set(['music', 'queue', 'sound']);
 
@@ -33,6 +33,11 @@ export function createRouter(bot, commands) {
 }
 
 async function fail(interaction, error, log) {
+  if (isExpiredInteraction(error)) {
+    // Discord only waits three seconds for the first answer, and it had already given up.
+    log.warn(`Discord dropped an interaction (${interaction.customId ?? '/' + interaction.commandName}) before it could be answered.`);
+    return;
+  }
   if (isUnexpected(error)) {
     const where = interaction.customId ? `component ${interaction.customId}` : `/${interaction.commandName}`;
     log.error(`${where} failed:`, error);

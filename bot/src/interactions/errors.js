@@ -4,6 +4,11 @@ import { command } from '../ui/mentions.js';
 
 const EXPECTED = new Set(['NO_NODES', 'NODE_NOT_READY', 'VOICE_TIMEOUT', 'QUEUE_FULL', 'PLAYER_DESTROYED', 'NO_TRACK', 'INVALID_ARGUMENT']);
 
+/** Discord dropped the interaction (10062) or it was already answered (40060). Nothing to fix, nothing to say. */
+export function isExpiredInteraction(error) {
+  return error?.code === 10062 || error?.code === 40060;
+}
+
 /** A friendly message for any error thrown while handling an interaction. */
 export function describeError(error) {
   if (error instanceof UserError) return error.message;
@@ -33,5 +38,6 @@ export function describeError(error) {
 
 /** Whether an error is worth logging (bugs and outages, not user mistakes). */
 export function isUnexpected(error) {
-  return !(error instanceof UserError) && !EXPECTED.has(error?.code);
+  if (error instanceof UserError || isExpiredInteraction(error)) return false;
+  return !EXPECTED.has(error?.code);
 }

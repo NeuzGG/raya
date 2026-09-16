@@ -1,26 +1,27 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { ButtonStyle } from 'discord.js';
-import { CATEGORIES, commandBodies, commands, commandsIn, visibleCategories } from '../src/commands/index.js';
+import { CATEGORIES, commandBodies, commands, commandsIn, dropdownCategories, helpOverview, helpSections } from '../src/commands/index.js';
 import { ConfigError, loadConfig } from '../src/config.js';
 import { setFilter } from '../src/music/filters.js';
 import { notice } from '../src/ui/components.js';
 import { clean, duration, humanDuration, parseTime, truncate } from '../src/ui/format.js';
-import { renderDashboardIdle } from '../src/ui/dashboard.js';
+import { renderDashboard, renderDashboardIdle } from '../src/ui/dashboard.js';
 import { renderHelp, renderLyrics, renderStats } from '../src/ui/info.js';
 import { command, setCommandIds } from '../src/ui/mentions.js';
 import { renderGoodbye, renderPanel, renderQueueEnd, renderTrackProblem } from '../src/ui/panel.js';
 import { renderClearConfirm, renderQueue } from '../src/ui/queue.js';
 import { renderSound } from '../src/ui/sound.js';
-import { assertCard, buttonById, buttons, menu, player, text, texts, thumbnail, track } from './helpers/cards.js';
+import { assertCard, buttonById, buttons, image, menu, player, text, texts, thumbnail, track } from './helpers/cards.js';
 
 const COVER = 'https://i.scdn.co/image/cover.png';
 
 /** The data /help hands to the card. */
 function helpFixture(overrides = {}) {
   const isAdmin = overrides.isAdmin ?? false;
-  const categories = visibleCategories(isAdmin);
-  const category = categories.find((entry) => entry.id === (overrides.categoryId ?? 'music')) ?? categories[0];
+  const categoryId = overrides.categoryId ?? 'music';
+  const categories = dropdownCategories(isAdmin);
+  const category = categories.find((entry) => entry.id === categoryId) ?? categories[0];
   return {
     name: 'Raya',
     avatar: 'https://cdn.discordapp.com/avatars/1/abc.png',
@@ -28,7 +29,8 @@ function helpFixture(overrides = {}) {
     announcement: { date: '2026-09-16', title: 'The official Raya bot is here', text: 'Buttons for everything.' },
     category,
     categories,
-    commands: commandsIn(category.id),
+    sections: helpSections(categoryId, isAdmin),
+    overview: helpOverview(isAdmin),
     stats: { servers: 3, playing: 1, ping: 42, version: '1.0.0', uptime: 7_200_000 },
     links: {
       invite: 'https://discord.com/oauth2/authorize?client_id=1',
@@ -62,6 +64,18 @@ function statsFixture(overrides = {}) {
   };
 }
 
+/** The data the /setup dashboard is drawn from. */
+function dashboardFixture(overrides = {}) {
+  return {
+    name: 'Raya',
+    avatar: 'https://cdn.discordapp.com/avatars/1/abc.png',
+    setup: { textChannelId: '500000000000000005', voiceChannelId: '300000000000000003' },
+    djRoleId: '700000000000000007',
+    links: { invite: 'https://discord.com/oauth2/authorize?client_id=1', website: 'https://neuzgg.github.io/raya/' },
+    ...overrides,
+  };
+}
+
 const many = (count) => Array.from({ length: count }, (_, i) => track(`Queued song ${i + 1}`));
 
 describe('cards follow the design rules', () => {
@@ -79,10 +93,13 @@ describe('cards follow the design rules', () => {
     lyrics: () => renderLyrics(track('Song'), { provider: 'Genius', sourceName: 'genius', text: 'la '.repeat(5000), lines: [], plugin: {} }),
     help: () => renderHelp(helpFixture()),
     'help for a manager': () => renderHelp(helpFixture({ isAdmin: true, categoryId: 'admin' })),
+    'help overview': () => renderHelp(helpFixture({ isAdmin: true, categoryId: 'all' })),
     'track problem': () => renderTrackProblem(track('Broken'), 'This video is unavailable'),
     notice: () => notice('Added a song', { note: 'plays next' }),
-    'idle dashboard': () =>
-      renderDashboardIdle({ name: 'Raya', avatar: COVER, voiceChannelId: '300000000000000003', djRoleId: '700000000000000007' }),
+    'idle dashboard': () => renderDashboardIdle(dashboardFixture()),
+    'idle dashboard without song requests': () => renderDashboardIdle(dashboardFixture({ requests: false })),
+    'playing dashboard': () =>
+      renderDashboard(dashboardFixture({ player: player({ current: track('On air', { artworkUrl: COVER }), queue: many(9) }) })),
     stats: () => renderStats(statsFixture()),
     'stats without nodes': () => renderStats(statsFixture({ nodes: [] })),
   };
@@ -284,15 +301,49 @@ describe('help menu', () => {
     assert.equal(thumbnail(card).media.url, 'https://cdn.discordapp.com/avatars/1/abc.png');
   });
 
+  it('counts the commands first and keeps the list behind the dropdown', () => {
+    const overview = texts(renderHelp(helpFixture({ isAdmin: true, categoryId: 'all' })))[2];
+    assert.ok(overview.startsWith(`**Raya has ${commands.length} commands!**\nPick a category in the dropdown below to see them.\n`), overview);
+    assert.deepEqual(overview.split('\n').slice(2), [
+      '🎵 **Music** · 8 commands',
+      '📜 **Queue** · 6 commands',
+      '🎛️ **Sound** · 2 commands',
+      '💡 **Info** · 4 commands',
+      '🛡️ **Admin** · 4 commands',
+    ]);
+    assert.ok(!overview.includes('/play'), 'no command list until a category is picked');
+
+    const focused = texts(renderHelp(helpFixture({ categoryId: 'sound' })));
+    assert.equal(focused.length, 4, 'intro, news, one category and the stats line');
+    assert.ok(focused[2].startsWith('🎛️ **Sound**\nIt has 2 commands\n'));
+    assert.ok(focused[2].includes('`/volume` `[level]` — Change the volume'));
+  });
+
+  it('counts only the commands a member can see', () => {
+    const member = texts(renderHelp(helpFixture({ categoryId: 'all' })))[2];
+    const adminCommands = commandsIn('admin').length;
+    assert.ok(member.startsWith(`**Raya has ${commands.length - adminCommands} commands!**`), member);
+    assert.ok(!member.includes('Admin'), 'the admin category stays hidden');
+  });
+
+  it('stays within Discord limits when a category has long mentions', () => {
+    setCommandIds(commands.map((entry, index) => ({ name: entry.data.name, id: `13141516171819${String(index).padStart(5, '0')}` })));
+    try {
+      for (const category of CATEGORIES) assertCard(renderHelp(helpFixture({ isAdmin: true, categoryId: category.id })));
+    } finally {
+      setCommandIds([]);
+    }
+  });
+
   it('hides the admin category unless you can manage the server', () => {
     const member = menu(renderHelp(helpFixture()));
-    assert.deepEqual(member.options.map((option) => option.value), ['music', 'queue', 'sound', 'info']);
+    assert.deepEqual(member.options.map((option) => option.value), ['all', 'music', 'queue', 'sound', 'info']);
     assert.equal(member.custom_id, 'help:400000000000000004', 'only the person who asked can switch category');
     assert.equal(member.placeholder, 'Browse the commands by category');
 
     const adminView = helpFixture({ isAdmin: true, categoryId: 'admin' });
     const manager = menu(renderHelp(adminView));
-    assert.deepEqual(manager.options.map((option) => option.value), ['music', 'queue', 'sound', 'info', 'admin']);
+    assert.deepEqual(manager.options.map((option) => option.value), ['all', 'music', 'queue', 'sound', 'info', 'admin']);
     assert.ok(manager.options.find((option) => option.value === 'admin').description);
     assert.ok(text(renderHelp(adminView)).includes('🛡️ **Admin**'));
     assert.ok(text(renderHelp(adminView)).includes('Force the player to stop and leave'));
@@ -336,13 +387,56 @@ describe('stats and dashboard', () => {
     assert.equal(versions, '-# raya.js 1.0.0 · discord.js 14.27.0 · Node 24.20.0');
   });
 
-  it('tells people where to play and who may control the music', () => {
-    const card = renderDashboardIdle({ name: 'Raya', voiceChannelId: '300000000000000003', djRoleId: '700000000000000007' });
+  it('tells people to just send a song, and who may control the music', () => {
+    const card = renderDashboardIdle(dashboardFixture());
     const content = text(card);
-    assert.ok(content.includes('**Raya** is ready'));
-    assert.ok(content.includes('Join <#300000000000000003>'));
-    assert.ok(content.includes('Only <@&700000000000000007> can skip, stop or change the sound.'));
-    assert.equal(buttons(card).length, 0, 'the idle dashboard has no dead buttons');
+    assert.ok(content.includes('**Raya** · nothing is playing'), content);
+    assert.ok(content.includes('Join <#300000000000000003> and **send a song name or a link** in this channel.'));
+    assert.ok(content.includes('Anyone can add songs; only <@&700000000000000007> can skip, stop or change the sound.'));
+    assert.deepEqual(
+      buttons(card).map((control) => control.custom_id ?? control.label),
+      ['dashboard:help', 'Add to server', 'Website'],
+    );
+    assert.equal(image(card), null, 'no picture until something plays');
+
+    const commandsOnly = text(renderDashboardIdle(dashboardFixture({ requests: false })));
+    assert.ok(commandsOnly.includes('start the music with `/play`'), commandsOnly);
+    assert.ok(!commandsOnly.includes('send a song name'), 'it never promises something that is turned off');
+  });
+
+  it('becomes the player with big cover art and what is up next', () => {
+    const playing = player({ current: track('On air', { artworkUrl: COVER }), queue: many(9), volume: 90, loop: 'queue' });
+    playing.data.set('songs', 4);
+    playing.data.set('since', Date.now() - 20 * 60_000);
+    const card = renderDashboard(dashboardFixture({ player: playing, listeners: 3 }));
+    assertCard(card);
+    const [song, next, footer] = texts(card);
+
+    assert.ok(song.startsWith('**[On air]'), song);
+    assert.deepEqual(image(card), { media: { url: COVER }, description: 'Cover art for On air' });
+    assert.ok(next.startsWith('**Up next**\n`1` [Queued song 1]'), next);
+    assert.ok(next.includes('-# 9 songs · 32m of music left · 4 more not shown'), next);
+    assert.ok(footer.includes('Volume 90% · Looping the queue'), footer);
+    assert.ok(footer.includes('3 people listening · 4 songs played · 20m in voice'), footer);
+
+    const ids = buttons(card).map((control) => control.custom_id ?? control.label);
+    assert.ok(ids.includes('player:toggle') && ids.includes('player:skip') && ids.includes('player:queue'));
+    assert.ok(ids.includes('dashboard:help'), 'the links row stays');
+  });
+
+  it('says when the queue will finish, but only when it really will', () => {
+    const now = 1_700_000_000_000;
+    const straight = player({ current: track('Now'), queue: many(3), position: 20_000 });
+    const ends = Math.round((now + 180_000 + 3 * 200_000) / 1000);
+    assert.ok(
+      texts(renderDashboard(dashboardFixture({ player: straight, now })))[1].includes(`ends around <t:${ends}:t>`),
+      texts(renderDashboard(dashboardFixture({ player: straight, now })))[1],
+    );
+
+    for (const endless of [{ loop: 'queue' }, { autoplay: true }]) {
+      const looping = player({ current: track('Now'), queue: many(3), position: 20_000, ...endless });
+      assert.ok(!texts(renderDashboard(dashboardFixture({ player: looping, now })))[1].includes('ends around'));
+    }
   });
 });
 

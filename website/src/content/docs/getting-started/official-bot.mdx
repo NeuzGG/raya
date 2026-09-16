@@ -15,10 +15,10 @@ import { Steps, Aside, CardGrid, Card } from '@astrojs/starlight/components';
     Previous, pause, skip, shuffle, stop, loop, autoplay, a sound board with volume and filters, the queue and lyrics.
   </Card>
   <Card title="Help that explains itself" icon="open-book">
-    A public `/help` card with what’s new, a category dropdown (admin commands only for server managers) and buttons to add the bot.
+    A public `/help` card with the command count, what’s new, a dropdown that opens each category (admin commands only for server managers) and buttons to add the bot.
   </Card>
-  <Card title="A request channel in one command" icon="setting">
-    `/setup` creates a category, a request channel and a voice channel, with a dashboard message that *is* the player. `/dj` keeps skips and stops to your DJs.
+  <Card title="Song requests in one command" icon="setting">
+    `/setup` creates a category, a request channel and a voice channel. People just type a song name there and it plays, while the dashboard message becomes the player: cover art, the next songs, when the queue ends and who is listening. `/dj` keeps skips and stops to your DJs.
   </Card>
   <Card title="Clean cards" icon="document">
     Built with discord.js display components: text, dividers and cover art, with no header and no accent color.
@@ -40,7 +40,8 @@ import { Steps, Aside, CardGrid, Card } from '@astrojs/starlight/components';
 | `/lyrics` | Lyrics of the current song (needs LavaLyrics) |
 | `/stop` · `/help` · `/ping` | Stop and leave, open the help menu, or check latency |
 | `/stats` | Bot, player and music server numbers |
-| `/setup` · `/dj` | Server managers only: create the request channel with a live dashboard, or pick who may control the music |
+| `/setup create` · `/setup delete` | Server managers only: make the song request channel, or delete it again |
+| `/dj set` · `/dj clear` | Server managers only: pick who may skip, stop and change the sound |
 | `/reset` · `/summon` | Server managers only: force the player to stop, or move the bot to your channel |
 
 Only people in the bot's voice channel, or members who can manage the server, can control the music. With `/dj set`, skips, stops and sound changes are limited to that role, while everyone can still add songs. Anyone can look at the queue.
@@ -60,7 +61,7 @@ You need Node.js 20.12+ and a [Lavalink v4 server](../installation/).
    cd bot && npm install
    ```
 
-2. Create an application in the [Discord Developer Portal](https://discord.com/developers/applications) and copy the bot token. No privileged intents are needed.
+2. Create an application in the [Discord Developer Portal](https://discord.com/developers/applications) and copy the bot token. Turn on the **Message Content** intent if you want song requests (typing a song name in the `/setup` channel); otherwise set `SONG_REQUESTS=false`.
 
 3. Copy `bot/.env.example` to `bot/.env` and fill in `DISCORD_TOKEN` and your Lavalink details.
 

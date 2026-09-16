@@ -15,6 +15,7 @@ import { ConfigError, loadConfig, loadEnvFile } from './config.js';
 import { createRouter } from './interactions/router.js';
 import { createLogger } from './logger.js';
 import { Panels } from './music/panels.js';
+import { attachSongRequests } from './music/requests.js';
 import { Settings } from './music/settings.js';
 import { setCommandIds } from './ui/mentions.js';
 
@@ -35,6 +36,7 @@ const INVITE_PERMISSIONS = [
   PermissionFlagsBits.ViewChannel,
   PermissionFlagsBits.SendMessages,
   PermissionFlagsBits.ManageChannels, // /setup creates the music channels
+  PermissionFlagsBits.ManageMessages, // tidying song requests away in the /setup channel
   PermissionFlagsBits.ReadMessageHistory,
   PermissionFlagsBits.Connect,
   PermissionFlagsBits.Speak,
@@ -45,7 +47,8 @@ const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildVoiceStates, // voice channels, and noticing when everyone leaves
-    GatewayIntentBits.GuildMessages, // knowing whether the player is still the newest message (no message content)
+    GatewayIntentBits.GuildMessages, // knowing whether the player is still the newest message
+    ...(config.songRequests ? [GatewayIntentBits.MessageContent] : []), // reading song requests in the /setup channel
   ],
   makeCache: Options.cacheWithLimits({
     ...Options.DefaultMakeCacheSettings,
@@ -111,6 +114,8 @@ const bot = {
     raya,
     log,
     settings,
+    links: () => ({ ...config.links, invite: inviteUrl }),
+    songRequests: config.songRequests,
     emptyLeaveDelay: config.player.leaveWhenEmptyAfter,
     queueEndLeaveDelay: config.player.leaveAfterQueueEnd,
   }).attach(),
@@ -118,6 +123,7 @@ const bot = {
 };
 
 client.on(Events.InteractionCreate, createRouter(bot, commands));
+if (config.songRequests) attachSongRequests(bot);
 
 client.once(Events.ClientReady, async (ready) => {
   inviteUrl = ready.generateInvite({ scopes: [OAuth2Scopes.Bot, OAuth2Scopes.ApplicationsCommands], permissions: INVITE_PERMISSIONS });
@@ -134,6 +140,10 @@ client.once(Events.ClientReady, async (ready) => {
     if (registered.length === 0) log.warn('No slash commands registered yet. Run: npm run deploy');
   } catch (error) {
     log.warn(`Could not fetch slash commands: ${error.message}`);
+  }
+
+  if (config.songRequests) {
+    log.info('Song requests are on: people can type a song in the /setup channel (needs the Message Content intent).');
   }
 
   updatePresence();
@@ -180,11 +190,13 @@ process.on('unhandledRejection', (error) => log.error('Unhandled rejection:', er
 try {
   await client.login(config.token);
 } catch (error) {
-  log.error(
+  const reason =
     error.code === 'TokenInvalid'
       ? 'Discord rejected DISCORD_TOKEN. Reset the token in the Developer Portal (Bot > Reset Token) and put the new one in bot/.env.'
-      : `Could not log in to Discord: ${error.message}`,
-  );
+      : error.code === 'DisallowedIntents'
+        ? 'Discord refused the Message Content intent, which song requests need. Turn it on in the Developer Portal (Bot > Privileged Gateway Intents), or set SONG_REQUESTS=false in bot/.env.'
+        : `Could not log in to Discord: ${error.message}`;
+  log.error(reason);
   await raya.destroy().catch(() => undefined);
   process.exit(1);
 }

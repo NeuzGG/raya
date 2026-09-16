@@ -1,11 +1,13 @@
 import { MessageFlags } from 'discord.js';
-import { replyWithLyrics } from '../commands/info.js';
+import { helpView, replyWithLyrics } from '../commands/info.js';
+import { setupChannels } from '../commands/setup.js';
 import { startAutoplay } from '../music/autoplay.js';
 import { clearFilters, toggleFilter } from '../music/filters.js';
-import { getControllablePlayer, getPlayer, UserError } from '../music/guards.js';
+import { getControllablePlayer, getPlayer, isManager, UserError } from '../music/guards.js';
 import { create, edit, notice } from '../ui/components.js';
 import { command } from '../ui/mentions.js';
 import { renderClearConfirm, renderQueue } from '../ui/queue.js';
+import { renderHelp } from '../ui/info.js';
 import { renderSound, VOLUME_STEP } from '../ui/sound.js';
 
 const NEXT_LOOP = { off: 'queue', queue: 'track', track: 'off' };
@@ -132,9 +134,57 @@ async function queueButton(interaction, bot, action, value) {
   }
 }
 
+/** The confirmation behind `/setup delete`. */
+async function setupButton(interaction, bot, action) {
+  if (!isManager(interaction)) throw new UserError('Only people who can manage this server can change the setup.');
+  if (action === 'keep') {
+    return interaction.update(edit(notice('Kept the channels', { note: 'Nothing was deleted.' })));
+  }
+
+  const channels = setupChannels(bot, interaction.guildId);
+  if (!bot.settings.setup(interaction.guildId)) {
+    return interaction.update(edit(notice('There is nothing to delete.')));
+  }
+
+  await interaction.update(edit(notice('Deleting the music channels…')));
+  bot.settings.update(interaction.guildId, { setup: null });
+
+  const deleted = [];
+  for (const channel of channels) {
+    const name = channel.name;
+    const gone = await channel
+      .delete('Raya setup deleted')
+      .then(() => true)
+      .catch((error) => {
+        bot.log.debug(`[setup] could not delete ${name}: ${error.message}`);
+        return false;
+      });
+    if (gone) deleted.push(name);
+  }
+
+  // The request channel may be gone, and the reply with it.
+  await interaction
+    .editReply(
+      edit(
+        deleted.length > 0
+          ? notice(`Deleted ${deleted.map((name) => `**${name}**`).join(', ')}`, { note: 'Music commands work everywhere again.' })
+          : notice("Couldn't delete the channels", { note: 'Check that I still have the Manage Channels permission.' }),
+      ),
+    )
+    .catch(() => undefined);
+}
+
+/** The Commands button on the song request dashboard. */
+function dashboardButton(interaction, bot) {
+  const view = helpView(bot, { categoryId: 'all', isAdmin: isManager(interaction), viewerId: interaction.user.id });
+  return interaction.reply(create(renderHelp(view), { ephemeral: true }));
+}
+
 /** Routes `scope:action:value` button ids. */
 export function handleButton(interaction, bot) {
   const [scope, action, value] = interaction.customId.split(':');
+  if (scope === 'dashboard') return dashboardButton(interaction, bot);
+  if (scope === 'setup') return setupButton(interaction, bot, action);
   if (scope === 'player') return playerButton(interaction, bot, action);
   if (scope === 'sound') return soundButton(interaction, bot, action, value);
   if (scope === 'queue') return queueButton(interaction, bot, action, value);

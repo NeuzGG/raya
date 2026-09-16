@@ -92,6 +92,8 @@ export function loadConfig(env = process.env) {
       maxQueueSize: integer(env, 'MAX_QUEUE_SIZE', 1000, 1, 10000),
     },
     voiceStatus: bool(env, 'VOICE_STATUS', true),
+    // Play what people type in the /setup channel (needs the Message Content intent)
+    songRequests: bool(env, 'SONG_REQUESTS', true),
     // Shown at the top of /help; falls back to src/announcements.js
     announcement: text(env, 'ANNOUNCEMENT'),
     links: {

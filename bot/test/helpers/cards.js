@@ -97,6 +97,12 @@ export function thumbnail(input) {
   return section ? section.accessory : null;
 }
 
+/** The full-width picture of a card, or null. */
+export function image(input) {
+  const gallery = json(input).components.find((component) => component.type === ComponentType.MediaGallery);
+  return gallery ? gallery.items[0] : null;
+}
+
 /**
  * The Raya card rules: one container with no accent color, content made of text and dividers
  * (the first block may carry cover art as a section thumbnail, never a markdown header),
@@ -160,11 +166,25 @@ export function assertCard(input) {
 
     assert.ok(!seenRow, 'controls come last');
 
+    if (component.type === ComponentType.MediaGallery) {
+      count++;
+      assert.equal(card.components[index - 1]?.type, ComponentType.TextDisplay, 'a picture follows the text it belongs to');
+      assert.ok(component.items.length >= 1 && component.items.length <= 10, '1-10 pictures');
+      for (const item of component.items) {
+        assert.match(item.media.url, /^https:\/\//, 'pictures are https URLs');
+        assert.ok(item.description?.length > 0, 'pictures have alt text');
+      }
+      return;
+    }
+
     if (component.type === ComponentType.Separator) {
       count++;
       const before = card.components[index - 1]?.type;
       const after = card.components[index + 1]?.type;
-      assert.ok(before === ComponentType.TextDisplay || before === ComponentType.Section, 'separators follow content');
+      assert.ok(
+        before === ComponentType.TextDisplay || before === ComponentType.Section || before === ComponentType.MediaGallery,
+        'separators follow content',
+      );
       assert.ok(
         after === ComponentType.TextDisplay || after === ComponentType.Section || after === ComponentType.ActionRow,
         'separators split content',

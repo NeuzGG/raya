@@ -31,7 +31,17 @@ function announcementBlock(announcement) {
   return `**${clean(announcement.title, 80)}**${when ? ` · ${when}` : ''}\n${clean(announcement.text, 400)}`;
 }
 
-function commandsBlock(category, commands) {
+function overviewBlock(overview, name) {
+  const lines = overview.categories.map(
+    ({ category, count }) => `${category.emoji} **${category.label}** · ${plural(count, 'command')}`,
+  );
+  return (
+    `**${inline(name || 'Raya', 40)} has ${plural(overview.total, 'command')}!**\n` +
+    `Pick a category in the dropdown below to see them.\n${lines.join('\n')}`
+  );
+}
+
+function commandsBlock({ category, commands }) {
   if (commands.length === 0) return `${category.emoji} **${category.label}**\nIt has no commands yet.`;
   const lines = commands.map((entry) => {
     const args = entry.usage ? ` \`${entry.usage}\`` : '';
@@ -62,7 +72,8 @@ function statsBlock(stats) {
  *   announcement?: { date: string | null, title: string, text: string } | null,
  *   category: { id: string, label: string, emoji: string, description?: string },
  *   categories: Array<{ id: string, label: string, emoji: string, description?: string }>,
- *   commands: Array<{ name: string, usage?: string, summary: string }>,
+ *   sections: Array<{ category: { id: string, label: string, emoji: string }, commands: Array<{ name: string, usage?: string, summary: string }> }>,
+ *   overview: { total: number, categories: Array<{ category: { label: string, emoji: string }, count: number }> },
  *   stats: { servers: number, playing: number, ping: number | null, version: string, uptime: number },
  *   links: { invite?: string | null, website?: string | null, github?: string | null, support?: string | null },
  *   viewerId: string,
@@ -71,11 +82,14 @@ function statsBlock(stats) {
 export function renderHelp(view) {
   const intro =
     `**${clean(view.name || 'Raya', 40)}** · ${clean(view.tagline || 'music that never stops', 80)}\n` +
-    `Play music from YouTube, Spotify, SoundCloud and more. Type **/** in the chat to see every command, ` +
-    `use the buttons on the player, or pick a category below.`;
+    'Play music from YouTube, Spotify, SoundCloud and more. Type **/** in the chat to see every command, ' +
+    'or use the buttons on the player.';
+
+  const commandBlocks =
+    view.sections.length > 0 ? view.sections.map(commandsBlock) : [overviewBlock(view.overview, view.name)];
 
   return card(
-    [intro, announcementBlock(view.announcement), commandsBlock(view.category, view.commands), statsBlock(view.stats)],
+    [intro, announcementBlock(view.announcement), ...commandBlocks, statsBlock(view.stats)],
     [
       select(`help:${view.viewerId}`, {
         placeholder: 'Browse the commands by category',
