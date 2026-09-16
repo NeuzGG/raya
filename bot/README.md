@@ -2,9 +2,13 @@
 
 The official Raya music bot, built with [raya.js](../README.md) and discord.js [display components](https://discordjs.guide/legacy/popular-topics/display-components).
 
-- **One live player per server.** A single message that updates itself: the song, a countdown to the end, what's up next, and the controls. When a new song starts, the player moves to the bottom of the chat and the old one is removed.
+- **One live player per server.** A single message that updates itself: the song with its cover art, a countdown to the end, what's up next, and the controls. When a new song starts, the player moves to the bottom of the chat and the old one is removed.
 - **Buttons for everything:** previous, pause, skip, shuffle, stop, loop, autoplay, sound board (volume and filters), queue and lyrics.
-- **Clean cards:** text and dividers only, with no header and no accent color.
+- **Clean cards:** text and dividers only, cover art beside the song, and no header or accent color.
+- **A /help that explains itself:** what's new, a category dropdown (admin commands only for server managers) and buttons to add the bot, open the website or GitHub.
+- **A queue you can steer:** cover art, who added what, paging, shuffle, clear, and a dropdown to jump straight to a song.
+- **`/setup` in one command:** a category, a request channel and a voice channel, plus a dashboard message that *is* the player: it never gets deleted, and falls back to an idle card when the music stops.
+- **DJ role:** `/dj set` keeps skips, stops and sound changes to your DJs, while everyone can still add songs.
 - **Restart-proof:** `Ctrl+C` saves every player and the music keeps playing while the bot restarts.
 - **Safe by default:** only people in the bot's voice channel (or server managers) can control the music; song titles can't inject markdown or mentions, and the bot never pings anyone.
 
@@ -21,7 +25,10 @@ The official Raya music bot, built with [raya.js](../README.md) and discord.js [
 | `/loop [mode]` · `/autoplay` | Loop the song or queue, keep playing related songs |
 | `/volume [level]` · `/filters [preset]` | Volume (0-200) and bass boost, nightcore, 8D, ... |
 | `/lyrics` | Lyrics of the current song (needs LavaLyrics on your Lavalink) |
-| `/stop` · `/help` | Stop and leave, or show help |
+| `/stop` · `/help` · `/ping` | Stop and leave, show the help menu, or check latency |
+| `/stats` | Bot, player and music server numbers |
+| `/setup` · `/dj` | Server managers only: create the request channel with a live dashboard, or pick who may control the music |
+| `/reset` · `/summon` | Server managers only: force the player to stop, or move the bot to your channel |
 
 ## Setup
 
@@ -46,7 +53,7 @@ npm run deploy   # all servers; with DEV_GUILD_ID set, only that server (instant
 npm start        # prints the invite link on startup
 ```
 
-Invite the bot with the link it prints. It asks for View Channel, Send Messages, Read Message History, Connect, Speak and Set Voice Channel Status.
+Invite the bot with the link it prints. It asks for View Channel, Send Messages, Read Message History, Connect, Speak, Set Voice Channel Status, and Manage Channels (only used by `/setup`).
 
 To restart without stopping the music, press `Ctrl+C` (or send `SIGTERM`) and start the bot again within a minute. Players are saved to `bot/data/snapshot.json` and picked up on the next start.
 
@@ -72,6 +79,8 @@ Every option is in [`.env.example`](.env.example):
 ## Customizing
 
 - **Emojis:** [`src/ui/emojis.js`](src/ui/emojis.js). Upload application emojis in the Developer Portal and use `<:name:id>`.
+- **Announcements:** [`src/announcements.js`](src/announcements.js) feeds the top of `/help`, or set `ANNOUNCEMENT` in `bot/.env` for a one-off notice.
+- **Help menu:** [`src/commands/catalog.js`](src/commands/catalog.js) holds the categories and one row per command. Add a row when you add a command; the tests check that nothing is missing.
 - **Cards:** every message is built with `card()` in [`src/ui/components.js`](src/ui/components.js). The player lives in [`src/ui/panel.js`](src/ui/panel.js).
 - **Commands:** [`src/commands`](src/commands). Run `npm run deploy` after changing names, descriptions or options.
 

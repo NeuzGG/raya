@@ -1,4 +1,5 @@
-import { create, edit } from '../ui/components.js';
+import { create, edit, notice } from '../ui/components.js';
+import { renderDashboardIdle } from '../ui/dashboard.js';
 import { renderGoodbye, renderPanel, renderQueueEnd, renderTrackProblem } from '../ui/panel.js';
 
 const GONE = new Set([10003, 10008, 50001]); // Unknown Channel, Unknown Message, Missing Access
@@ -8,26 +9,30 @@ const PROBLEM_NOTICE_TTL = 15_000;
 /**
  * Keeps one live player message per server.
  *
- * - A new song edits the panel in place when it's still the newest message in the channel,
- *   otherwise the panel moves to the bottom (new message, old one deleted).
- * - `/play` can claim the next panel so its own reply becomes the player instead of a second message.
+ * - With `/setup`, the player is the dashboard message in the request channel: it is edited in
+ *   place forever and falls back to an idle card when nothing is playing.
+ * - Without `/setup`, a new song edits the player in place while it is still the newest message
+ *   in the channel, otherwise the player moves to the bottom (new message, old one deleted), and
+ *   `/play` can claim it so its own reply becomes the player instead of a second message.
  * - Changes are coalesced and every Discord call for a server runs in order.
- * - The panel's location is stored in `player.data`, so it survives restarts with the player.
+ * - The player's location is stored in `player.data`, so it survives restarts with the player.
  */
 export class Panels {
   #client;
   #raya;
   #log;
+  #settings;
   #options;
   #chains = new Map();
   #timers = new Map();
   #claims = new Map();
   #lastProblem = new Map();
 
-  constructor({ client, raya, log, emptyLeaveDelay = 0, queueEndLeaveDelay = 0 }) {
+  constructor({ client, raya, log, settings = null, emptyLeaveDelay = 0, queueEndLeaveDelay = 0 }) {
     this.#client = client;
     this.#raya = raya;
     this.#log = log;
+    this.#settings = settings;
     this.#options = { emptyLeaveDelay, queueEndLeaveDelay };
   }
 
@@ -37,16 +42,16 @@ export class Panels {
       player.data.delete('queueEndedAt');
       player.data.set('songs', (player.data.get('songs') ?? 0) + 1);
       if (!player.data.has('since')) player.data.set('since', Date.now());
-      this.#task(player, () => this.#show(player, () => renderPanel(player, this.#options)));
+      this.#task(player.guildId, () => this.#show(player, () => renderPanel(player, this.#options)));
     });
     raya.on('queueEnd', (player, lastTrack) => {
       player.data.set('queueEndedAt', Date.now());
-      this.#task(player, () => this.#show(player, () => renderQueueEnd(player, lastTrack, this.#options)));
+      this.#task(player.guildId, () => this.#show(player, () => renderQueueEnd(player, lastTrack, this.#options)));
     });
     raya.on('playerDestroy', (player, reason) => {
       this.cancelRefresh(player);
       this.#claims.get(player.guildId)?.settle('destroyed');
-      this.#task(player, () => this.#finish(player, reason));
+      this.#task(player.guildId, () => this.#finish(player, reason));
     });
     raya.on('queueUpdate', (player) => this.refresh(player, 1500));
     raya.on('voiceChannelEmpty', (player) => {
@@ -58,8 +63,8 @@ export class Panels {
       this.refresh(player);
     });
     raya.on('playerResume', (player) => this.refresh(player));
-    raya.on('trackError', (player, track, exception) => this.#task(player, () => this.#problem(player, track, exception?.message)));
-    raya.on('trackStuck', (player, track) => this.#task(player, () => this.#problem(player, track, 'The song got stuck')));
+    raya.on('trackError', (player, track, exception) => this.#task(player.guildId, () => this.#problem(player, track, exception?.message)));
+    raya.on('trackStuck', (player, track) => this.#task(player.guildId, () => this.#problem(player, track, 'The song got stuck')));
     return this;
   }
 
@@ -70,19 +75,33 @@ export class Panels {
       : renderQueueEnd(player, player.queue.previous ?? null, this.#options);
   }
 
-  /** Use this message as the server's panel from now on. */
+  /** The idle dashboard card for a server that ran /setup. */
+  renderIdle(guildId) {
+    const setup = this.#settings?.setup(guildId);
+    return renderDashboardIdle({
+      name: this.#client.user?.displayName ?? 'Raya',
+      avatar: this.#client.user?.displayAvatarURL?.({ extension: 'png', size: 128 }) ?? null,
+      voiceChannelId: setup?.voiceChannelId ?? null,
+      djRoleId: this.#settings?.get(guildId)?.djRoleId ?? null,
+    });
+  }
+
+  /** Use this message as the server's player from now on. */
   adopt(player, message) {
     this.#remember(player, message);
   }
 
   /**
-   * Let an interaction's deferred reply become the next panel. `settled` resolves with
-   * 'consumed' (the reply is now the panel), 'failed' (the song couldn't start and the reply says so),
-   * 'replaced' (a newer claim took over), 'destroyed' or 'expired'.
+   * Let an interaction's deferred reply become the next player message. `settled` resolves with
+   * 'consumed' (the reply is now the player), 'failed' (the song couldn't start and the reply says so),
+   * 'replaced' (a newer claim took over), 'destroyed' or 'expired'. Servers with a dashboard never
+   * hand over the reply, because the player lives in the request channel.
    */
   claim(interaction) {
     const guildId = interaction.guildId;
     this.#claims.get(guildId)?.settle('replaced');
+    if (this.#dashboard(guildId)) return { state: 'released', settled: Promise.resolve('released'), settle: () => false };
+
     let resolve;
     const claim = {
       interaction,
@@ -103,13 +122,13 @@ export class Panels {
     return claim;
   }
 
-  /** Re-render the panel after a short delay; calls within the delay are merged into one edit. */
+  /** Re-render the player after a short delay; calls within the delay are merged into one edit. */
   refresh(player, delay = 300) {
     const guildId = player.guildId;
     clearTimeout(this.#timers.get(guildId));
     const timer = setTimeout(() => {
       this.#timers.delete(guildId);
-      this.#task(player, () => this.#update(player));
+      this.#task(guildId, () => this.#update(player));
     }, delay);
     timer.unref?.();
     this.#timers.set(guildId, timer);
@@ -120,8 +139,16 @@ export class Panels {
     this.#timers.delete(player.guildId);
   }
 
-  /** Post the panel as a new message at the bottom of the channel (or as an interaction reply). */
+  /** Post the player as a new message at the bottom of the channel (or as an interaction reply). */
   async repost(player, interaction) {
+    const dashboard = this.#dashboard(player.guildId);
+    if (dashboard) {
+      await this.#editMessage(dashboard, this.render(player));
+      await interaction.reply(
+        create(notice(`The player lives in <#${dashboard.channelId}>`, { note: 'It updates itself there.' }), { ephemeral: true }),
+      );
+      return;
+    }
     const container = this.render(player);
     const previous = player.data.get('panel');
     const response = await interaction.reply({ ...create(container), withResponse: true });
@@ -131,10 +158,45 @@ export class Panels {
     if (previous && previous.messageId !== message.id) await this.#delete(previous);
   }
 
+  /**
+   * Draw the idle dashboard of a server, creating the message when it is missing.
+   * Returns the message id, or null when the channel is gone.
+   */
+  async refreshDashboard(guildId) {
+    const setup = this.#settings?.setup(guildId);
+    if (!setup?.textChannelId) return null;
+    const player = this.#raya.getPlayer(guildId);
+    const container = player && !player.destroyed ? this.render(player) : this.renderIdle(guildId);
+    return this.#task(guildId, async () => {
+      if (setup.messageId && (await this.#editMessage({ channelId: setup.textChannelId, messageId: setup.messageId }, container))) {
+        return setup.messageId;
+      }
+      return this.#createDashboard(guildId, setup, container);
+    });
+  }
+
   // ==================== Internals ====================
 
-  #task(player, fn) {
-    const guildId = player.guildId;
+  #dashboard(guildId) {
+    const setup = this.#settings?.setup(guildId);
+    return setup?.textChannelId && setup.messageId
+      ? { channelId: setup.textChannelId, messageId: setup.messageId }
+      : null;
+  }
+
+  async #createDashboard(guildId, setup, container) {
+    const channel = this.#client.channels.cache.get(setup.textChannelId);
+    if (!channel?.isSendable?.()) return null;
+    const message = await channel.send(create(container)).catch((error) => {
+      this.#log.warn(`[dashboard ${guildId}] could not post: ${error.message}`);
+      return null;
+    });
+    if (!message) return null;
+    this.#settings.update(guildId, { setup: { ...setup, messageId: message.id } });
+    return message.id;
+  }
+
+  #task(guildId, fn) {
     const next = (this.#chains.get(guildId) ?? Promise.resolve())
       .then(fn)
       .catch((error) => this.#log.warn(`[panel ${guildId}]`, error?.message ?? error));
@@ -152,8 +214,16 @@ export class Panels {
   async #show(player, render) {
     if (player.destroyed) return;
     this.cancelRefresh(player);
-    const previous = player.data.get('panel');
 
+    const dashboard = this.#dashboard(player.guildId);
+    if (dashboard) {
+      if (await this.#editMessage(dashboard, render())) return;
+      const setup = this.#settings.setup(player.guildId);
+      await this.#createDashboard(player.guildId, setup, render());
+      return;
+    }
+
+    const previous = player.data.get('panel');
     const claim = this.#claims.get(player.guildId);
     if (claim?.settle('consumed')) {
       try {
@@ -167,7 +237,7 @@ export class Panels {
     }
 
     if (previous && previous.channelId === player.textChannelId && this.#isNewest(previous)) {
-      if (await this.#edit(player, previous, render())) return;
+      if (await this.#editMessage(previous, render(), player)) return;
     }
 
     const channel = player.textChannelId ? this.#client.channels.cache.get(player.textChannelId) : null;
@@ -184,13 +254,18 @@ export class Panels {
 
   async #update(player) {
     if (player.destroyed) return;
-    const panel = player.data.get('panel');
-    if (panel) await this.#edit(player, panel, this.render(player));
+    const target = this.#dashboard(player.guildId) ?? player.data.get('panel');
+    if (target) await this.#editMessage(target, this.render(player), player);
   }
 
   async #finish(player, reason) {
+    const dashboard = this.#dashboard(player.guildId);
+    if (dashboard) {
+      await this.#editMessage(dashboard, this.renderIdle(player.guildId));
+      return;
+    }
     const panel = player.data.get('panel');
-    if (panel) await this.#edit(player, panel, renderGoodbye(player, reason));
+    if (panel) await this.#editMessage(panel, renderGoodbye(player, reason), player);
   }
 
   async #problem(player, track, message) {
@@ -212,20 +287,21 @@ export class Panels {
     return this.#client.channels.cache.get(panel.channelId)?.lastMessageId === panel.messageId;
   }
 
-  async #edit(player, panel, container) {
-    const channel = this.#client.channels.cache.get(panel.channelId);
+  /** Edit a message we own; returns false when it is gone. */
+  async #editMessage(ref, container, player = null) {
+    const channel = this.#client.channels.cache.get(ref.channelId);
     if (!channel?.messages) {
-      player.data.delete('panel');
+      player?.data.delete('panel');
       return false;
     }
     try {
-      await channel.messages.edit(panel.messageId, edit(container));
+      await channel.messages.edit(ref.messageId, edit(container));
       return true;
     } catch (error) {
       if (GONE.has(error.code)) {
-        if (player.data.get('panel')?.messageId === panel.messageId) player.data.delete('panel');
+        if (player?.data.get('panel')?.messageId === ref.messageId) player.data.delete('panel');
       } else {
-        this.#log.debug(`[panel ${player.guildId}] edit failed: ${error.message}`);
+        this.#log.debug(`[panel ${ref.channelId}] edit failed: ${error.message}`);
       }
       return false;
     }

@@ -92,12 +92,15 @@ export function loadConfig(env = process.env) {
       maxQueueSize: integer(env, 'MAX_QUEUE_SIZE', 1000, 1, 10000),
     },
     voiceStatus: bool(env, 'VOICE_STATUS', true),
+    // Shown at the top of /help; falls back to src/announcements.js
+    announcement: text(env, 'ANNOUNCEMENT'),
     links: {
       website: url(env, 'WEBSITE_URL', 'https://neuzgg.github.io/raya/'),
       github: url(env, 'GITHUB_URL', 'https://github.com/neuzgg/raya'),
       support: url(env, 'SUPPORT_URL', null),
     },
     snapshotFile: path.resolve(BOT_ROOT, text(env, 'SNAPSHOT_FILE', 'data/snapshot.json')),
+    settingsFile: path.resolve(BOT_ROOT, text(env, 'SETTINGS_FILE', 'data/guilds.json')),
     debug: bool(env, 'RAYA_DEBUG', false),
   };
 }

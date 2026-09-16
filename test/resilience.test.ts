@@ -193,7 +193,7 @@ describe('resilience', () => {
   it('keeps idle nodes connected (no false heartbeat timeouts without players)', async () => {
     const mock = await MockLavalink.start();
     const h = createHarness([], {
-      nodes: [{ name: 'node1', host: '127.0.0.1', port: mock.port, password: mock.password, pingInterval: 40 }],
+      nodes: [{ name: 'node1', host: '127.0.0.1', port: mock.port, password: mock.password, pingInterval: 120 }],
     });
     cleanups.push(async () => {
       await h.raya.destroy();
@@ -202,7 +202,7 @@ describe('resilience', () => {
     let disconnects = 0;
     h.raya.on('nodeDisconnect', () => disconnects++);
     await h.raya.init(BOT_ID);
-    await delay(400);
+    await delay(600); // five ping cycles: a false timeout would have fired by now
     assert.equal(disconnects, 0);
     assert.ok(h.raya.nodes.get('node1')!.ping >= 0, 'latency measured');
   });

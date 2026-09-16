@@ -2,7 +2,7 @@ import { SlashCommandBuilder } from 'discord.js';
 import { isUrl } from 'raya.js';
 import { assertCanJoin, getControllablePlayer, getPlayer, memberVoiceChannel, UserError } from '../music/guards.js';
 import { create, edit, notice } from '../ui/components.js';
-import { clean, duration, humanDuration, length, parseTime, plural, trackAuthor, trackLink, truncate } from '../ui/format.js';
+import { artwork, clean, duration, humanDuration, length, parseTime, plural, safeUrl, trackAuthor, trackLink, truncate } from '../ui/format.js';
 import { queuePositionAutocomplete } from './shared.js';
 
 const AUTOCOMPLETE_TIMEOUT = 2500;
@@ -21,19 +21,32 @@ function humansIn(guild, channelId) {
   return guild.channels.cache.get(channelId)?.members?.filter((member) => !member.user.bot).size ?? 0;
 }
 
+/** Cover art for a playlist: the playlist's own art, or the first song's. */
+function playlistArtwork(result, added) {
+  return (
+    safeUrl(result.playlist?.pluginInfo?.artworkUrl) ??
+    safeUrl(result.playlist?.pluginInfo?.thumbnail) ??
+    artwork(added[0]) ??
+    null
+  );
+}
+
 function addedCard(player, result, added, { playNext, total }) {
   const left = total - added.length;
   const full = left > 0 ? ` · the queue is full, ${plural(left, 'song')} left out` : '';
   if (result.type === 'playlist') {
     const time = humanDuration(added.reduce((sum, track) => sum + (track.info.isStream ? 0 : track.info.length), 0));
-    return notice(`Added **${plural(added.length, 'song')}** from **${clean(result.playlist?.name ?? 'playlist', 80)}**`, {
+    const name = clean(result.playlist?.name ?? 'playlist', 80);
+    return notice(`Added **${plural(added.length, 'song')}** from **${name}**`, {
       note: `${time} · ${playNext ? 'playing next' : `starting at #${player.queue.indexOf(added[0]) + 1} in the queue`}${full}`,
+      thumbnail: { url: playlistArtwork(result, added), description: `Cover art for ${result.playlist?.name ?? 'the playlist'}` },
     });
   }
   const [track] = added;
   const position = player.queue.indexOf(track) + 1;
   return notice(`Added ${trackLink(track, 70)} · ${trackAuthor(track, 40)}`, {
     note: `${length(track)} · ${position === 1 ? 'plays next' : `#${position} in the queue`}${full}`,
+    thumbnail: { url: artwork(track), description: `Cover art for ${track.info.title}` },
   });
 }
 
@@ -85,12 +98,13 @@ const play = {
     if (result.type === 'error') throw new UserError(`Couldn't load that: ${clean(result.exception?.message ?? 'unknown error', 150)}`);
     if (result.tracks.length === 0) throw new UserError(`No results for **${clean(query, 80)}**. Try other words or a link.`);
 
+    const home = bot.settings?.setup(interaction.guildId)?.textChannelId ?? interaction.channelId;
     const player = await bot.raya.join({
       guildId: interaction.guildId,
       voiceChannelId: channel.id,
-      textChannelId: interaction.channelId,
+      textChannelId: home,
     });
-    player.setTextChannel(interaction.channelId);
+    player.setTextChannel(home);
 
     const tracks = result.type === 'playlist' ? result.tracks : result.tracks.slice(0, 1);
     const claim = bot.panels.claim(interaction);
@@ -116,21 +130,28 @@ const play = {
     }
     if (state === 'failed') return;
     const [first] = outcome.added;
-    await interaction.editReply(edit(notice(`Playing ${trackLink(first, 70)} · ${trackAuthor(first, 40)}`, { note: length(first) })));
+    await interaction.editReply(
+      edit(
+        notice(`Playing ${trackLink(first, 70)} · ${trackAuthor(first, 40)}`, {
+          note: length(first),
+          thumbnail: { url: artwork(first), description: `Cover art for ${first.info.title}` },
+        }),
+      ),
+    );
   },
 };
 
 const nowplaying = {
   data: new SlashCommandBuilder().setName('nowplaying').setDescription('Bring the player to the bottom of the chat'),
   async run({ interaction, bot }) {
-    await bot.panels.repost(getPlayer(bot.raya, interaction), interaction);
+    await bot.panels.repost(getPlayer(bot, interaction), interaction);
   },
 };
 
 const pause = {
   data: new SlashCommandBuilder().setName('pause').setDescription('Pause the music'),
   async run({ interaction, bot }) {
-    const player = getControllablePlayer(bot.raya, interaction, { needsTrack: true });
+    const player = getControllablePlayer(bot, interaction, { needsTrack: true });
     if (player.paused) throw new UserError('The music is already paused.');
     await player.pause();
     bot.panels.refresh(player);
@@ -141,7 +162,7 @@ const pause = {
 const resume = {
   data: new SlashCommandBuilder().setName('resume').setDescription('Resume the music'),
   async run({ interaction, bot }) {
-    const player = getControllablePlayer(bot.raya, interaction, { needsTrack: true });
+    const player = getControllablePlayer(bot, interaction, { needsTrack: true });
     if (!player.paused) throw new UserError("The music isn't paused.");
     await player.resume();
     player.data.delete('emptySince');
@@ -159,7 +180,7 @@ const skip = {
     ),
   autocomplete: queuePositionAutocomplete,
   async run({ interaction, bot }) {
-    const player = getControllablePlayer(bot.raya, interaction);
+    const player = getControllablePlayer(bot, interaction);
     const to = interaction.options.getInteger('to');
     if (!player.current && player.queue.isEmpty) throw new UserError('There is nothing to skip.');
     if (to !== null) {
@@ -178,7 +199,7 @@ const skip = {
 const previous = {
   data: new SlashCommandBuilder().setName('previous').setDescription('Play the previous song again'),
   async run({ interaction, bot }) {
-    const player = getControllablePlayer(bot.raya, interaction);
+    const player = getControllablePlayer(bot, interaction);
     const track = await player.previous();
     if (!track) throw new UserError('There is no previous song.');
     await interaction.reply(create(notice(`Playing ${trackLink(track, 70)} again`)));
@@ -193,7 +214,7 @@ const seek = {
       option.setName('time').setDescription('Like 1:30, 90, 2m, or +10 / -10 to jump forward or back').setRequired(true).setMaxLength(20),
     ),
   async run({ interaction, bot }) {
-    const player = getControllablePlayer(bot.raya, interaction, { needsTrack: true });
+    const player = getControllablePlayer(bot, interaction, { needsTrack: true });
     const track = player.current;
     if (!track.info.isSeekable || track.info.isStream) throw new UserError("You can't jump around in this song.");
     const raw = interaction.options.getString('time', true).trim();
@@ -211,7 +232,7 @@ const seek = {
 const stop = {
   data: new SlashCommandBuilder().setName('stop').setDescription('Stop the music, clear the queue and leave'),
   async run({ interaction, bot }) {
-    const player = getControllablePlayer(bot.raya, interaction);
+    const player = getControllablePlayer(bot, interaction);
     player.data.set('stoppedBy', interaction.user.id);
     await player.destroy({ reason: 'stopped' });
     await interaction.reply(create(notice('Stopped the music. See you next time!')));

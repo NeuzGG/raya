@@ -15,6 +15,7 @@ import { ConfigError, loadConfig, loadEnvFile } from './config.js';
 import { createRouter } from './interactions/router.js';
 import { createLogger } from './logger.js';
 import { Panels } from './music/panels.js';
+import { Settings } from './music/settings.js';
 import { setCommandIds } from './ui/mentions.js';
 
 loadEnvFile();
@@ -33,6 +34,7 @@ const log = createLogger({ debug: config.debug });
 const INVITE_PERMISSIONS = [
   PermissionFlagsBits.ViewChannel,
   PermissionFlagsBits.SendMessages,
+  PermissionFlagsBits.ManageChannels, // /setup creates the music channels
   PermissionFlagsBits.ReadMessageHistory,
   PermissionFlagsBits.Connect,
   PermissionFlagsBits.Speak,
@@ -97,15 +99,18 @@ raya.on('playerError', (player, error) => log.warn(`Player ${player.guildId}: ${
 // ==================== Bot ====================
 
 let inviteUrl = null;
+const settings = new Settings(config.settingsFile);
 const bot = {
   client,
   raya,
   config,
   log,
+  settings,
   panels: new Panels({
     client,
     raya,
     log,
+    settings,
     emptyLeaveDelay: config.player.leaveWhenEmptyAfter,
     queueEndLeaveDelay: config.player.leaveAfterQueueEnd,
   }).attach(),
@@ -164,6 +169,7 @@ async function shutdown(signal) {
   } catch (error) {
     log.error('Could not save players:', error);
   }
+  settings.flush();
   await client.destroy();
   process.exit(0);
 }

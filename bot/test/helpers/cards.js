@@ -60,70 +60,132 @@ export function json(input) {
   return container.toJSON();
 }
 
+function contentOf(component) {
+  if (component.type === ComponentType.TextDisplay) return [component.content];
+  if (component.type === ComponentType.Section) return component.components.map((text) => text.content);
+  return [];
+}
+
 export function texts(input) {
-  return json(input).components.filter((c) => c.type === ComponentType.TextDisplay).map((c) => c.content);
+  return json(input).components.flatMap(contentOf);
 }
 
 export function text(input) {
   return texts(input).join('\n');
 }
 
-export function buttons(input) {
+export function controls(input) {
   return json(input)
-    .components.filter((c) => c.type === ComponentType.ActionRow)
+    .components.filter((component) => component.type === ComponentType.ActionRow)
     .flatMap((row) => row.components);
 }
 
+export { controls as buttons };
+
 export function buttonById(input, id) {
-  return buttons(input).find((b) => b.custom_id === id);
+  return controls(input).find((control) => control.custom_id === id);
+}
+
+/** The dropdown of a card, or null. */
+export function menu(input) {
+  return controls(input).find((control) => control.type === ComponentType.StringSelect) ?? null;
+}
+
+/** The cover art (section thumbnail) of a card, or null. */
+export function thumbnail(input) {
+  const section = json(input).components.find((component) => component.type === ComponentType.Section);
+  return section ? section.accessory : null;
 }
 
 /**
- * The Raya card rules: one container with no accent color, text displays and dividers only
- * (content first, never a markdown header), buttons at the bottom, within Discord's limits.
+ * The Raya card rules: one container with no accent color, content made of text and dividers
+ * (the first block may carry cover art as a section thumbnail, never a markdown header),
+ * controls at the bottom, all within Discord's limits.
  */
 export function assertCard(input) {
   const card = json(input);
   assert.equal(card.type, ComponentType.Container);
   assert.equal(card.accent_color, undefined, 'no accent color');
   assert.ok(card.components.length > 0);
-  assert.equal(card.components[0].type, ComponentType.TextDisplay, 'starts with content, not a separator or header block');
+  assert.ok(
+    card.components[0].type === ComponentType.TextDisplay || card.components[0].type === ComponentType.Section,
+    'starts with content, not a separator or header block',
+  );
 
   let seenRow = false;
   let count = 1;
   let characters = 0;
   const ids = new Set();
-  card.components.forEach((component, index) => {
+
+  const checkText = (component) => {
     count++;
-    if (component.type === ComponentType.ActionRow) {
-      seenRow = true;
-      assert.ok(component.components.length >= 1 && component.components.length <= 5, 'rows hold 1-5 buttons');
-      for (const b of component.components) {
-        count++;
-        assert.equal(b.type, ComponentType.Button);
-        if (b.custom_id) {
-          assert.ok(!ids.has(b.custom_id), `duplicate button id ${b.custom_id}`);
-          assert.ok(b.custom_id.length <= 100);
-          ids.add(b.custom_id);
-        }
-        if (b.label) assert.ok(b.label.length <= 80);
-      }
-      return;
-    }
-    assert.ok(!seenRow, 'buttons come last');
-    if (component.type === ComponentType.Separator) {
-      const before = card.components[index - 1]?.type;
-      const after = card.components[index + 1]?.type;
-      assert.equal(before, ComponentType.TextDisplay, 'separators follow text');
-      assert.ok(after === ComponentType.TextDisplay || after === ComponentType.ActionRow, 'separators split content');
-      return;
-    }
-    assert.equal(component.type, ComponentType.TextDisplay, `only text, separators and buttons (got type ${component.type})`);
+    assert.equal(component.type, ComponentType.TextDisplay, `only text in content (got type ${component.type})`);
     characters += component.content.length;
     for (const line of component.content.split('\n')) {
       assert.ok(!/^#{1,3}\s/.test(line), `no markdown headers: "${line}"`);
     }
+  };
+
+  card.components.forEach((component, index) => {
+    if (component.type === ComponentType.ActionRow) {
+      count++;
+      seenRow = true;
+      assert.ok(component.components.length >= 1 && component.components.length <= 5, 'rows hold 1-5 components');
+      for (const control of component.components) {
+        count++;
+        assert.ok(
+          control.type === ComponentType.Button || control.type === ComponentType.StringSelect,
+          'rows hold buttons or a dropdown',
+        );
+        if (control.custom_id) {
+          assert.ok(!ids.has(control.custom_id), `duplicate id ${control.custom_id}`);
+          assert.ok(control.custom_id.length <= 100);
+          ids.add(control.custom_id);
+        }
+        if (control.label) assert.ok(control.label.length <= 80);
+        if (control.type === ComponentType.StringSelect) {
+          assert.equal(component.components.length, 1, 'a dropdown gets its own row');
+          assert.ok(control.options.length >= 1 && control.options.length <= 25, '1-25 options');
+          const values = new Set();
+          for (const option of control.options) {
+            assert.ok(option.label.length <= 100 && option.value.length <= 100);
+            assert.ok(!option.description || option.description.length <= 100);
+            assert.ok(!values.has(option.value), `duplicate option ${option.value}`);
+            values.add(option.value);
+          }
+        }
+      }
+      return;
+    }
+
+    assert.ok(!seenRow, 'controls come last');
+
+    if (component.type === ComponentType.Separator) {
+      count++;
+      const before = card.components[index - 1]?.type;
+      const after = card.components[index + 1]?.type;
+      assert.ok(before === ComponentType.TextDisplay || before === ComponentType.Section, 'separators follow content');
+      assert.ok(
+        after === ComponentType.TextDisplay || after === ComponentType.Section || after === ComponentType.ActionRow,
+        'separators split content',
+      );
+      return;
+    }
+
+    if (component.type === ComponentType.Section) {
+      count++;
+      assert.ok(component.components.length >= 1 && component.components.length <= 3, 'a section holds 1-3 texts');
+      component.components.forEach(checkText);
+      count++;
+      assert.equal(component.accessory.type, ComponentType.Thumbnail, 'the only accessory is cover art');
+      assert.match(component.accessory.media.url, /^https:\/\//, 'cover art is an https URL');
+      assert.ok(component.accessory.description?.length > 0, 'cover art has alt text');
+      return;
+    }
+
+    checkText(component);
   });
+
   assert.ok(count <= 40, `at most 40 components (got ${count})`);
   assert.ok(characters <= 4000, `at most 4000 characters of text (got ${characters})`);
 }

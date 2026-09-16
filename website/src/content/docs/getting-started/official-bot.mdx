@@ -9,13 +9,19 @@ import { Steps, Aside, CardGrid, Card } from '@astrojs/starlight/components';
 
 <CardGrid>
   <Card title="One live player" icon="seti:audio">
-    A single message per server shows the song, a countdown to the end and what's up next. When a new song starts, the player moves to the bottom of the chat.
+    A single message per server shows the song with its cover art, a countdown to the end and what's up next. When a new song starts, the player moves to the bottom of the chat.
   </Card>
   <Card title="Buttons for everything" icon="puzzle">
     Previous, pause, skip, shuffle, stop, loop, autoplay, a sound board with volume and filters, the queue and lyrics.
   </Card>
+  <Card title="Help that explains itself" icon="open-book">
+    A public `/help` card with what’s new, a category dropdown (admin commands only for server managers) and buttons to add the bot.
+  </Card>
+  <Card title="A request channel in one command" icon="setting">
+    `/setup` creates a category, a request channel and a voice channel, with a dashboard message that *is* the player. `/dj` keeps skips and stops to your DJs.
+  </Card>
   <Card title="Clean cards" icon="document">
-    Built with discord.js display components: text and dividers only, no header, no accent color.
+    Built with discord.js display components: text, dividers and cover art, with no header and no accent color.
   </Card>
 </CardGrid>
 
@@ -32,9 +38,12 @@ import { Steps, Aside, CardGrid, Card } from '@astrojs/starlight/components';
 | `/loop [mode]` · `/autoplay` | Loop the song or queue, keep playing related songs |
 | `/volume [level]` · `/filters [preset]` | Volume (0-200), bass boost, nightcore, 8D and more |
 | `/lyrics` | Lyrics of the current song (needs LavaLyrics) |
-| `/stop` · `/help` | Stop and leave, or show help |
+| `/stop` · `/help` · `/ping` | Stop and leave, open the help menu, or check latency |
+| `/stats` | Bot, player and music server numbers |
+| `/setup` · `/dj` | Server managers only: create the request channel with a live dashboard, or pick who may control the music |
+| `/reset` · `/summon` | Server managers only: force the player to stop, or move the bot to your channel |
 
-Only people in the bot's voice channel, or members who can manage the server, can control the music. Anyone can look at the queue.
+Only people in the bot's voice channel, or members who can manage the server, can control the music. With `/dj set`, skips, stops and sound changes are limited to that role, while everyone can still add songs. Anyone can look at the queue.
 
 ## Run it yourself
 
@@ -72,5 +81,6 @@ To restart without stopping the music, press `Ctrl+C` and start the bot again wi
 
 - **Emojis** are in `src/ui/emojis.js`. Swap in your own application emojis as `<:name:id>`.
 - **Every message** is built with one `card()` helper in `src/ui/components.js`, so the look stays consistent.
+- **The help menu** takes its categories and command rows from `src/commands/catalog.js`, and its news from `src/announcements.js`.
 - **The player** lives in `src/ui/panel.js`, and `src/music/panels.js` keeps one live player message per server.
 - **Tests** check every card against the design rules and run full `/play` → button flows against a Lavalink simulator: `npm test`.

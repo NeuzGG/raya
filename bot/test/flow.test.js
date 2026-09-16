@@ -7,11 +7,12 @@ import { ButtonStyle } from 'discord.js';
 import { commands } from '../src/commands/index.js';
 import { createRouter } from '../src/interactions/router.js';
 import { Panels } from '../src/music/panels.js';
-import { assertCard, buttonById, buttons, text } from './helpers/cards.js';
-import { click, createDiscord, GUILD_ID, OTHER_VOICE_ID, slash, STRANGER, TEXT_ID, USER, VOICE_ID } from './helpers/discord.js';
+import { MemorySettings } from '../src/music/settings.js';
+import { assertCard, buttonById, buttons, menu, text, thumbnail } from './helpers/cards.js';
+import { choose, click, createDiscord, GUILD_ID, OTHER_VOICE_ID, slash, STRANGER, TEXT_ID, USER, VOICE_ID } from './helpers/discord.js';
 
 const require = createRequire(import.meta.url);
-const { MockLavalink } = require('../../build/test/helpers/MockLavalink.js');
+const { MockLavalink, makeTrack } = require('../../build/test/helpers/MockLavalink.js');
 const { BOT_ID, createHarness, waitFor } = require('../../build/test/helpers/harness.js');
 
 const silent = { debug() {}, info() {}, warn() {}, error() {} };
@@ -32,14 +33,16 @@ describe('bot flow', () => {
     await harness.raya.init(BOT_ID);
     discord = createDiscord();
     const logged = [];
+    const settings = new MemorySettings();
     bot = {
       client: discord.client,
       raya: harness.raya,
-      config: { player: { maxVolume: 200 }, links: {} },
+      config: { player: { maxVolume: 200 }, links: { github: 'https://github.com/neuzgg/raya' }, announcement: null },
       log: { ...silent, error: (...args) => logged.push(args) },
       logged,
+      settings,
       invite: () => null,
-      panels: new Panels({ client: discord.client, raya: harness.raya, log: silent }).attach(),
+      panels: new Panels({ client: discord.client, raya: harness.raya, log: silent, settings }).attach(),
     };
     route = createRouter(bot, commands);
     discord.join(USER);
@@ -118,9 +121,10 @@ describe('bot flow', () => {
     const elsewhere = await run(slash(discord, 'skip', {}, { user: STRANGER }));
     assert.match(text(elsewhere.ephemeralReplies[0].payload), /Join <#300000000000000003>/);
 
-    // Anyone may look at the queue.
+    // Anyone may look at the queue, and it stays in the chat for everyone.
     const look = await run(click(discord, panelMessage(), 'player:queue', { user: STRANGER }));
-    assert.match(text(look.ephemeralReplies[0].payload), /The queue is empty/);
+    assert.deepEqual(look.ephemeralReplies, [], 'the queue is public');
+    assert.match(text(look.replyMessage.payload), /The queue is empty/);
   });
 
   it('explains problems instead of failing silently', async () => {
@@ -137,14 +141,35 @@ describe('bot flow', () => {
     assert.equal(harness.raya.getPlayer(GUILD_ID), undefined);
   });
 
-  it('adds playlists and pages through the queue', async () => {
+  it('adds playlists with their cover and pages through the queue', async () => {
+    mock.loadHandler = (identifier) => {
+      if (identifier === 'https://example.com/playlist') {
+        return {
+          loadType: 'playlist',
+          data: {
+            info: { name: 'Mock Playlist', selectedTrack: -1 },
+            pluginInfo: { artworkUrl: 'https://i.scdn.co/image/playlist.png' },
+            tracks: [1, 2, 3].map((i) => makeTrack(`Playlist Song ${i}`, { identifier: `pl-${i}` })),
+          },
+        };
+      }
+      const query = identifier.replace(/^\w+:/, '');
+      return { loadType: 'search', data: [1, 2, 3].map((i) => makeTrack(`${query} ${i}`, { identifier: `${query}-${i}` })) };
+    };
+
     await run(slash(discord, 'play', { query: 'now playing' }));
     await waitFor(() => player()?.current);
     const playlist = await run(slash(discord, 'play', { query: 'https://example.com/playlist' }));
     assert.match(text(playlist.replyMessage.payload), /^Added \*\*3 songs\*\* from \*\*Mock Playlist\*\*/);
+    assert.equal(
+      thumbnail(playlist.replyMessage.payload).media.url,
+      'https://i.scdn.co/image/playlist.png',
+      "the playlist's own cover is used",
+    );
 
     const view = await run(slash(discord, 'queue'));
-    const board = view.ephemeralReplies[0];
+    const board = view.replyMessage;
+    assert.deepEqual(view.ephemeralReplies, [], 'the queue is public');
     assertCard(board.payload);
     assert.match(text(board.payload), /`1` \[Playlist Song 1\]/);
 
@@ -189,5 +214,132 @@ describe('bot flow', () => {
     assert.match(text(skip.replyMessage.payload), /Skipped to \[song three 1\]/);
     await waitFor(() => player().current?.info.title === 'song three 1', 3000, 'jumped');
     assert.equal(TEXT_ID, player().textChannelId);
+  });
+
+  it('answers /help in the channel, and only its owner can switch category', async () => {
+    const help = await run(slash(discord, 'help'));
+    const message = help.replyMessage;
+
+    assert.deepEqual(help.ephemeralReplies, [], 'help is public');
+    assert.ok(discord.text.visible.includes(message), 'it stays in the chat for everyone');
+    assertCard(message.payload);
+    const content = text(message.payload);
+    assert.ok(content.includes('**Raya** · music that never stops'));
+    assert.ok(content.includes('The official Raya bot is here'), 'the announcement is shown');
+    assert.ok(content.includes('🎵 **Music**'));
+    assert.equal(thumbnail(message.payload).media.url, 'https://cdn.discordapp.com/avatars/1/abc.png');
+    assert.deepEqual(
+      buttons(message.payload).filter((control) => control.style === ButtonStyle.Link).map((link) => link.label),
+      ['GitHub'],
+    );
+
+    const dropdown = menu(message.payload);
+    assert.equal(dropdown.custom_id, `help:${USER.id}`);
+    assert.deepEqual(dropdown.options.map((option) => option.value), ['music', 'queue', 'sound', 'info'], 'no admin category');
+
+    await run(choose(discord, message, dropdown.custom_id, 'sound'));
+    assert.ok(text(message.payload).includes('🎛️ **Sound**'), 'the same message switched category');
+
+    const other = await run(choose(discord, message, dropdown.custom_id, 'queue', { user: STRANGER }));
+    assert.equal(other.ephemeralReplies.length, 1);
+    assert.ok(text(other.ephemeralReplies[0].payload).includes('belongs to someone else'));
+    assert.ok(text(message.payload).includes('🎛️ **Sound**'), 'and left the card alone');
+  });
+
+  it('shows cover art and jumps to a song from the queue dropdown', async () => {
+    mock.loadHandler = (identifier) => ({
+      loadType: 'search',
+      data: [1, 2, 3].map((i) =>
+        makeTrack(`${identifier.replace(/^\w+:/, '')} ${i}`, {
+          identifier: `art-${i}-${Math.random().toString(36).slice(2, 8)}`,
+          artworkUrl: 'https://i.scdn.co/image/cover.png',
+        }),
+      ),
+    });
+
+    await run(slash(discord, 'play', { query: 'first' }));
+    await waitFor(() => player()?.data.get('panel'), 3000, 'panel');
+    assert.equal(thumbnail(panelMessage().payload).media.url, 'https://i.scdn.co/image/cover.png', 'the song cover is on the player');
+
+    const added = await run(slash(discord, 'play', { query: 'second' }));
+    assert.equal(thumbnail(added.replyMessage.payload).media.url, 'https://i.scdn.co/image/cover.png', 'and on the added card');
+    await run(slash(discord, 'play', { query: 'third' }));
+    await waitFor(() => player().queue.size === 2);
+
+    const view = await run(slash(discord, 'queue'));
+    const board = view.replyMessage;
+    const jump = menu(board.payload);
+    assert.equal(jump.custom_id, 'queue:jump:0');
+
+    await run(choose(discord, board, jump.custom_id, '2'));
+    await waitFor(() => player().current?.info.title === 'third 1', 3000, 'jumped to the second song in the queue');
+    assert.ok(text(board.payload).includes('Jumped to [third 1]'), text(board.payload));
+  });
+
+  it('sets up a request channel whose dashboard becomes the player', async () => {
+    await run(slash(discord, 'setup', {}, { subcommand: 'create', manager: true }));
+    const setup = bot.settings.setup(GUILD_ID);
+    assert.ok(setup.categoryId && setup.textChannelId && setup.voiceChannelId, 'category, text and voice channels were created');
+
+    const home = discord.channel(setup.textChannelId);
+    const dashboard = home.store.get(setup.messageId);
+    assertCard(dashboard.payload);
+    assert.ok(text(dashboard.payload).includes('**Raya** is ready'));
+    assert.ok(text(dashboard.payload).includes(`<#${setup.voiceChannelId}>`), 'it points at the voice channel');
+
+    // Music commands belong in the request channel now.
+    const elsewhere = await run(slash(discord, 'play', { query: 'wrong room' }));
+    assert.match(text(elsewhere.ephemeralReplies[0].payload), new RegExp(`Use <#${setup.textChannelId}> for music commands`));
+    assert.equal(harness.raya.getPlayer(GUILD_ID), undefined, 'nothing started');
+
+    // In the request channel the dashboard turns into the player, in place.
+    await run(slash(discord, 'play', { query: 'dash song' }, { channelId: setup.textChannelId }));
+    await waitFor(() => text(dashboard.payload).includes('dash song 1'), 3000, 'the dashboard became the player');
+    assert.equal(home.store.get(setup.messageId), dashboard, 'the same message is reused');
+    assert.equal(
+      home.visible.filter((message) => text(message.payload).includes('dash song 1')).length,
+      2,
+      'the dashboard plus the /play reply',
+    );
+
+    await run(slash(discord, 'stop', {}, { channelId: setup.textChannelId }));
+    await waitFor(() => text(dashboard.payload).includes('**Raya** is ready'), 3000, 'back to the idle dashboard');
+    assert.equal(home.deleted.length, 0, 'the dashboard is never deleted');
+  });
+
+  it('lets only DJs change the music once a DJ role is set', async () => {
+    const DJ_ROLE = '700000000000000007';
+    await run(slash(discord, 'dj', { role: { id: DJ_ROLE } }, { subcommand: 'set', manager: true }));
+    assert.equal(bot.settings.get(GUILD_ID).djRoleId, DJ_ROLE);
+
+    // Anyone can still add songs.
+    await run(slash(discord, 'play', { query: 'dj song' }));
+    await run(slash(discord, 'play', { query: 'another song' }));
+    await waitFor(() => player()?.queue.size === 1);
+
+    const denied = await run(slash(discord, 'skip'));
+    assert.match(text(denied.ephemeralReplies[0].payload), new RegExp(`Only <@&${DJ_ROLE}> can change the music`));
+    assert.equal(player().current?.info.title, 'dj song 1', 'still playing');
+
+    const allowed = await run(slash(discord, 'skip', {}, { roles: [DJ_ROLE] }));
+    assert.match(text(allowed.replyMessage.payload), /Skipped \[dj song 1\]/);
+
+    await run(slash(discord, 'dj', {}, { subcommand: 'clear', manager: true }));
+    assert.equal(bot.settings.get(GUILD_ID).djRoleId, undefined);
+  });
+
+  it('reports bot, player and node numbers', async () => {
+    await run(slash(discord, 'play', { query: 'counted song' }));
+    await waitFor(() => player()?.current);
+
+    const stats = await run(slash(discord, 'stats'));
+    const card = stats.replyMessage.payload;
+    assertCard(card);
+    const content = text(card);
+    assert.ok(content.includes('Playing in 1 server of 1'), content);
+    assert.ok(content.includes('1 player'), content);
+    assert.ok(content.includes('**Music servers**'));
+    assert.ok(content.includes('**node1**'), 'the Lavalink node is listed');
+    assert.ok(content.includes('gateway 42ms'));
   });
 });

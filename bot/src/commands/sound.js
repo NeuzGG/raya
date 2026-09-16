@@ -14,11 +14,11 @@ const volume = {
   async run({ interaction, bot }) {
     const level = interaction.options.getInteger('level');
     if (level === null) {
-      const player = getPlayer(bot.raya, interaction);
+      const player = getPlayer(bot, interaction);
       await interaction.reply(create(renderSound(player, { maxVolume: bot.config.player.maxVolume }), { ephemeral: true }));
       return;
     }
-    const player = getControllablePlayer(bot.raya, interaction);
+    const player = getControllablePlayer(bot, interaction);
     await player.setVolume(Math.min(level, bot.config.player.maxVolume));
     bot.panels.refresh(player);
     await interaction.reply(create(notice(`Volume set to **${player.volume}%**`)));
@@ -38,11 +38,11 @@ const filters = {
   async run({ interaction, bot }) {
     const preset = interaction.options.getString('preset');
     if (preset === null) {
-      const player = getPlayer(bot.raya, interaction);
+      const player = getPlayer(bot, interaction);
       await interaction.reply(create(renderSound(player, { maxVolume: bot.config.player.maxVolume }), { ephemeral: true }));
       return;
     }
-    const player = getControllablePlayer(bot.raya, interaction);
+    const player = getControllablePlayer(bot, interaction);
     if (preset === 'clear') {
       await clearFilters(player);
       bot.panels.refresh(player);

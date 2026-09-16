@@ -33,15 +33,15 @@ async function playerButton(interaction, bot, action) {
   if (!existing || existing.destroyed) return interaction.update(ended());
 
   if (action === 'sound') {
-    const player = getPlayer(bot.raya, interaction);
+    const player = getPlayer(bot, interaction);
     return interaction.reply(create(renderSound(player, { maxVolume: bot.config.player.maxVolume }), { ephemeral: true }));
   }
   if (action === 'queue') {
-    return interaction.reply(create(renderQueue(getPlayer(bot.raya, interaction), 0), { ephemeral: true }));
+    return interaction.reply(create(renderQueue(getPlayer(bot, interaction), 0)));
   }
-  if (action === 'lyrics') return replyWithLyrics(interaction, getPlayer(bot.raya, interaction));
+  if (action === 'lyrics') return replyWithLyrics(interaction, getPlayer(bot, interaction));
 
-  const player = getControllablePlayer(bot.raya, interaction);
+  const player = getControllablePlayer(bot, interaction);
   switch (action) {
     case 'toggle': {
       if (!player.current) throw new UserError('Nothing is playing right now.');
@@ -91,7 +91,7 @@ async function playerButton(interaction, bot, action) {
 async function soundButton(interaction, bot, action, value) {
   const existing = bot.raya.getPlayer(interaction.guildId);
   if (!existing || existing.destroyed) return interaction.update(edit(notice('Nothing is playing anymore.')));
-  const player = getControllablePlayer(bot.raya, interaction);
+  const player = getControllablePlayer(bot, interaction);
   const { maxVolume } = bot.config.player;
 
   if (action === 'volume') {
@@ -115,15 +115,15 @@ async function queueButton(interaction, bot, action, value) {
     case 'page':
       return interaction.update(edit(renderQueue(existing, page)));
     case 'shuffle': {
-      const player = getControllablePlayer(bot.raya, interaction);
+      const player = getControllablePlayer(bot, interaction);
       player.queue.shuffle();
       return interaction.update(edit(renderQueue(player, page)));
     }
     case 'clear':
-      getControllablePlayer(bot.raya, interaction);
+      getControllablePlayer(bot, interaction);
       return interaction.update(edit(renderClearConfirm(existing, page)));
     case 'clear-confirm': {
-      const player = getControllablePlayer(bot.raya, interaction);
+      const player = getControllablePlayer(bot, interaction);
       player.queue.clear();
       return interaction.update(edit(renderQueue(player, 0)));
     }

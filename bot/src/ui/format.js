@@ -78,6 +78,14 @@ export function clean(value, max = 100) {
   return escapeLine(truncate(String(value ?? '').replace(/\s+/g, ' ').trim(), max));
 }
 
+/**
+ * Single-line text that is placed in the middle of a line (inside bold, after a label).
+ * Only inline markdown is escaped, so version numbers keep their dots.
+ */
+export function inline(value, max = 100) {
+  return truncate(String(value ?? '').replace(/\s+/g, ' ').trim(), max).replace(/[\\*_~|`[\]<>]/g, '\\$&');
+}
+
 /** Escape markdown in multi-line text (lyrics), keeping line breaks. */
 export function escapeBlock(value) {
   return String(value ?? '').split('\n').map(escapeLine).join('\n');
@@ -89,10 +97,20 @@ export function safeUrl(value) {
   return value.replace(/\(/g, '%28').replace(/\)/g, '%29');
 }
 
+/** The page a track came from, e.g. its Spotify or YouTube link. */
+export function trackUrl(track) {
+  return safeUrl(track?.info?.uri) ?? safeUrl(track?.pluginInfo?.url) ?? null;
+}
+
+/** Cover art for a track, or null. */
+export function artwork(track) {
+  return safeUrl(track?.info?.artworkUrl) ?? safeUrl(track?.pluginInfo?.artworkUrl) ?? null;
+}
+
 /** `[Title](url)` or just the title. */
 export function trackLink(track, max = 60) {
   const title = clean(track.info.title || 'Unknown title', max);
-  const link = safeUrl(track.info.uri);
+  const link = trackUrl(track);
   return link ? `[${title}](${link})` : title;
 }
 
@@ -117,4 +135,11 @@ export function timestamp(ms, style = 'R') {
 
 export function plural(count, word, suffix = 's') {
   return `${count} ${count === 1 ? word : word + suffix}`;
+}
+
+/** The requester's name as plain text (no mention), or null. */
+export function requesterName(track) {
+  const requester = track?.requester;
+  const name = requester?.globalName ?? requester?.username ?? requester?.name ?? null;
+  return typeof name === 'string' && name.trim() ? clean(name, 32) : null;
 }

@@ -27,8 +27,9 @@ class FakeMessage {
 }
 
 class FakeTextChannel {
-  constructor(id) {
+  constructor(id, name = 'general') {
     this.id = id;
+    this.name = name;
     this.type = ChannelType.GuildText;
     this.lastMessageId = null;
     this.store = new Map();
@@ -76,12 +77,14 @@ export function createDiscord() {
   const voiceStates = new Collection();
   const guild = {
     id: GUILD_ID,
-    members: { me: { id: 'bot' } },
+    members: { me: { id: 'bot', permissions: { has: () => true } } },
     channels: { cache: new Collection() },
     voiceStates: { cache: voiceStates },
   };
-  const voiceChannel = (id) => ({
+
+  const voiceChannel = (id, name = 'Voice') => ({
     id,
+    name,
     type: ChannelType.GuildVoice,
     guild,
     joinable: true,
@@ -92,15 +95,32 @@ export function createDiscord() {
       );
     },
   });
-  const voice = voiceChannel(VOICE_ID);
-  const otherVoice = voiceChannel(OTHER_VOICE_ID);
-  guild.channels.cache.set(VOICE_ID, voice).set(OTHER_VOICE_ID, otherVoice).set(TEXT_ID, text);
+
+  guild.channels.cache.set(VOICE_ID, voiceChannel(VOICE_ID)).set(OTHER_VOICE_ID, voiceChannel(OTHER_VOICE_ID)).set(TEXT_ID, text);
+
+  guild.channels.create = async ({ name, type, parent = null }) => {
+    const id = snowflake();
+    let channel;
+    if (type === ChannelType.GuildVoice) channel = voiceChannel(id, name);
+    else if (type === ChannelType.GuildCategory) channel = { id, name, type, guild };
+    else channel = new FakeTextChannel(id, name);
+    channel.parentId = parent;
+    guild.channels.cache.set(id, channel);
+    return channel;
+  };
 
   return {
     guild,
     text,
-    client: { channels: { cache: guild.channels.cache }, guilds: { cache: new Collection([[GUILD_ID, guild]]) } },
-    join(user, channel = voice) {
+    channel: (id) => guild.channels.cache.get(id),
+    client: {
+      channels: { cache: guild.channels.cache },
+      guilds: { cache: new Collection([[GUILD_ID, guild]]) },
+      user: { id: '100000000000000001', displayName: 'Raya', displayAvatarURL: () => 'https://cdn.discordapp.com/avatars/1/abc.png' },
+      uptime: 7_200_000,
+      ws: { ping: 42 },
+    },
+    join(user, channel = guild.channels.cache.get(VOICE_ID)) {
       voiceStates.set(user.id, { user, channel });
     },
     leave(user) {
@@ -109,13 +129,14 @@ export function createDiscord() {
   };
 }
 
-function baseInteraction(discord, user) {
+function baseInteraction(discord, { user = USER, manager = false, roles = [], channelId = TEXT_ID } = {}) {
   const interaction = {
     guildId: GUILD_ID,
     guild: discord.guild,
-    channelId: TEXT_ID,
+    channelId,
     user,
-    memberPermissions: { has: () => false },
+    member: { roles: { cache: new Collection(roles.map((id) => [id, { id }])) } },
+    memberPermissions: { has: () => manager },
     deferred: false,
     replied: false,
     ephemeralReplies: [],
@@ -124,15 +145,17 @@ function baseInteraction(discord, user) {
     isAutocomplete: () => false,
     isChatInputCommand: () => false,
     isButton: () => false,
+    isStringSelectMenu: () => false,
   };
 
+  const channel = discord.channel(channelId) ?? discord.text;
   const deliver = (payload) => {
     if (isEphemeral(payload)) {
-      const message = new FakeMessage(discord.text, payload, { ephemeral: true });
+      const message = new FakeMessage(channel, payload, { ephemeral: true });
       interaction.ephemeralReplies.push(message);
       return message;
     }
-    return discord.text.post(payload);
+    return channel.post(payload);
   };
 
   Object.assign(interaction, {
@@ -161,9 +184,9 @@ function baseInteraction(discord, user) {
   return interaction;
 }
 
-/** A slash command interaction with `options` by name. */
-export function slash(discord, commandName, options = {}, { user = USER } = {}) {
-  const interaction = baseInteraction(discord, user);
+/** A slash command interaction with `options` by name. `context` sets the channel, roles and permissions. */
+export function slash(discord, commandName, options = {}, context = {}) {
+  const interaction = baseInteraction(discord, context);
   Object.assign(interaction, {
     commandName,
     isChatInputCommand: () => true,
@@ -171,15 +194,26 @@ export function slash(discord, commandName, options = {}, { user = USER } = {}) 
       getString: (name) => options[name] ?? null,
       getInteger: (name) => options[name] ?? null,
       getBoolean: (name) => options[name] ?? null,
+      getRole: (name) => options[name] ?? null,
       getFocused: () => '',
+      getSubcommand: () => context.subcommand ?? null,
     },
   });
   return interaction;
 }
 
+/** Picking an option from a dropdown on `message`. */
+export function choose(discord, message, customId, values, context = {}) {
+  const interaction = click(discord, message, customId, context);
+  interaction.values = Array.isArray(values) ? values : [values];
+  interaction.isButton = () => false;
+  interaction.isStringSelectMenu = () => true;
+  return interaction;
+}
+
 /** A button click on `message`. */
-export function click(discord, message, customId, { user = USER } = {}) {
-  const interaction = baseInteraction(discord, user);
+export function click(discord, message, customId, context = {}) {
+  const interaction = baseInteraction(discord, { channelId: message.channelId, ...context });
   Object.assign(interaction, {
     customId,
     message,

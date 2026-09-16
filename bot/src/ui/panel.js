@@ -3,6 +3,7 @@ import { emojis } from './emojis.js';
 import { command } from './mentions.js';
 import { filterLabels } from '../music/filters.js';
 import {
+  artwork,
   clean,
   duration,
   humanDuration,
@@ -106,6 +107,7 @@ export function renderPanel(player, options = {}) {
         hasLyrics(player) && button('player:lyrics', { emoji: emojis.lyrics, label: 'Lyrics' }),
       ),
     ],
+    { thumbnail: { url: artwork(track), description: `Cover art for ${track.info.title}` } },
   );
 }
 
@@ -135,6 +137,7 @@ export function renderQueueEnd(player, lastTrack, options = {}) {
         button('player:leave', { emoji: emojis.leave, label: 'Leave', style: ButtonStyle.Danger }),
       ),
     ],
+    lastTrack ? { thumbnail: { url: artwork(lastTrack), description: `Cover art for ${lastTrack.info.title}` } } : {},
   );
 }
 

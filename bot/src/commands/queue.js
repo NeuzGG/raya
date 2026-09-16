@@ -12,9 +12,9 @@ const queue = {
     .setDescription('See and manage the queue')
     .addIntegerOption((option) => option.setName('page').setDescription('Page to open').setMinValue(1)),
   async run({ interaction, bot }) {
-    const player = getPlayer(bot.raya, interaction);
+    const player = getPlayer(bot, interaction);
     const page = (interaction.options.getInteger('page') ?? 1) - 1;
-    await interaction.reply(create(renderQueue(player, page), { ephemeral: true }));
+    await interaction.reply(create(renderQueue(player, page)));
   },
 };
 
@@ -27,7 +27,7 @@ const remove = {
     ),
   autocomplete: queuePositionAutocomplete,
   async run({ interaction, bot }) {
-    const player = getControllablePlayer(bot.raya, interaction);
+    const player = getControllablePlayer(bot, interaction);
     const position = interaction.options.getInteger('position', true);
     const removed = player.queue.remove(position - 1);
     if (!removed) throw new UserError(`There's no song at #${position}. The queue has ${plural(player.queue.size, 'song')}.`);
@@ -45,7 +45,7 @@ const move = {
     .addIntegerOption((option) => option.setName('to').setDescription('Its new position (1 plays next)').setRequired(true).setMinValue(1)),
   autocomplete: queuePositionAutocomplete,
   async run({ interaction, bot }) {
-    const player = getControllablePlayer(bot.raya, interaction);
+    const player = getControllablePlayer(bot, interaction);
     const from = interaction.options.getInteger('from', true);
     const to = Math.min(interaction.options.getInteger('to', true), player.queue.size);
     const track = player.queue.at(from - 1);
@@ -58,7 +58,7 @@ const move = {
 const shuffle = {
   data: new SlashCommandBuilder().setName('shuffle').setDescription('Shuffle the queue'),
   async run({ interaction, bot }) {
-    const player = getControllablePlayer(bot.raya, interaction);
+    const player = getControllablePlayer(bot, interaction);
     if (player.queue.size < 2) throw new UserError('Add at least two songs to the queue to shuffle it.');
     player.queue.shuffle();
     await interaction.reply(create(notice(`Shuffled ${plural(player.queue.size, 'song')}`)));
@@ -83,7 +83,7 @@ const loop = {
         .addChoices({ name: 'Off', value: 'off' }, { name: 'Queue', value: 'queue' }, { name: 'Song', value: 'track' }),
     ),
   async run({ interaction, bot }) {
-    const player = getControllablePlayer(bot.raya, interaction);
+    const player = getControllablePlayer(bot, interaction);
     const mode = interaction.options.getString('mode') ?? NEXT_LOOP[player.loop];
     player.setLoop(mode);
     bot.panels.refresh(player);
@@ -97,7 +97,7 @@ const autoplay = {
     .setDescription('Keep playing related songs when the queue ends')
     .addBooleanOption((option) => option.setName('enabled').setDescription('Leave empty to toggle')),
   async run({ interaction, bot }) {
-    const player = getControllablePlayer(bot.raya, interaction);
+    const player = getControllablePlayer(bot, interaction);
     const enabled = interaction.options.getBoolean('enabled') ?? !player.autoplay;
     player.setAutoplay(enabled);
     bot.panels.refresh(player);
