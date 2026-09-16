@@ -18,7 +18,7 @@ Fast, resilient and easy to use: players that survive bot restarts, dead nodes a
 [Quick start](https://neuzgg.github.io/raya/getting-started/quick-start/) ·
 [Live demo](https://neuzgg.github.io/raya/#demo) ·
 [Config Builder](https://neuzgg.github.io/raya/tools/config-builder/) ·
-[Official bot](bot/)
+[Add the bot](https://discord.com/oauth2/authorize?client_id=1549552307799199846&scope=bot+applications.commands&permissions=281474979933200)
 
 </div>
 
@@ -145,13 +145,14 @@ await raya.use(new NowPlayingFeed({
 // Only the song is shared: no server names or usernames.
 ```
 
-## Official bot
+## The official bot
 
-[**Raya Bot**](bot/) is a complete music bot built with raya.js and discord.js display components:
-- one live player per server with cover art, and buttons for playback, loop, autoplay, sound, queue and lyrics
-- search suggestions, autocomplete, filters and lyrics, with restart-proof players
+**Raya** is the music bot built on this library, and you can [add it to your server](https://discord.com/oauth2/authorize?client_id=1549552307799199846&scope=bot+applications.commands&permissions=281474979933200) instead of hosting anything:
+- one live player per server with cover art, a progress bar and buttons for everything
+- `/setup` makes a song request channel where typing a song name plays it
+- search suggestions, filters, lyrics, a DJ role, and players that survive restarts
 
-Run it yourself or use it as a starting point. See [`bot/README.md`](bot/README.md). For something smaller, there's also a [minimal example](examples/discordjs-bot.js).
+See what it can do on the [official bot page](https://neuzgg.github.io/raya/getting-started/official-bot/). Building your own? Start with the [quick start](https://neuzgg.github.io/raya/getting-started/quick-start/) or the [example bot](examples/discordjs-bot.js).
 
 ## Documentation
 

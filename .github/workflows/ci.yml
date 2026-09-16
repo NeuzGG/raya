@@ -22,8 +22,3 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: npm test
-      - name: Official bot
-        working-directory: bot
-        run: |
-          npm ci
-          npm test

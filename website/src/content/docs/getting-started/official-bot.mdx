@@ -1,27 +1,27 @@
 ---
 title: Official bot
-description: Raya Bot, the official music bot built with raya.js and Discord display components. Run it yourself or use it as a starting point.
+description: Raya, the official music bot built with raya.js. Add it to your server for song requests, a live player with cover art, filters and lyrics.
 ---
 
-import { Steps, Aside, CardGrid, Card } from '@astrojs/starlight/components';
+import { Steps, Aside, CardGrid, Card, LinkButton } from '@astrojs/starlight/components';
+import { SITE } from '../../../site.mjs';
 
-**Raya Bot** is the official music bot for raya.js. It's a complete, production-ready bot you can run as it is, or read to see how the pieces fit together. The source is in the [`bot/` folder on GitHub](https://github.com/neuzgg/raya/tree/main/bot).
+**Raya** is the official music bot built on raya.js. Add it to your server and it plays from YouTube, Spotify, SoundCloud, Apple Music, Deezer and more, with a player you drive with buttons.
+
+<LinkButton href={SITE.invite} icon="external" variant="primary">Add Raya to your server</LinkButton>
 
 <CardGrid>
   <Card title="One live player" icon="seti:audio">
-    A single message per server shows the song with its cover art, a countdown to the end and what's up next. When a new song starts, the player moves to the bottom of the chat.
+    A single message per server shows the song with its cover art, a progress bar that keeps moving, a countdown to the end and what's up next. When a new song starts, the player moves to the bottom of the chat.
   </Card>
   <Card title="Buttons for everything" icon="puzzle">
     Previous, pause, skip, shuffle, stop, loop, autoplay, a sound board with volume and filters, the queue and lyrics.
   </Card>
-  <Card title="Help that explains itself" icon="open-book">
-    A public `/help` card with the command count, what’s new, a dropdown that opens each category (admin commands only for server managers) and buttons to add the bot.
-  </Card>
   <Card title="Song requests in one command" icon="setting">
-    `/setup` creates a category, a request channel and a voice channel. People just type a song name there and it plays, while the dashboard message becomes the player: cover art, the next songs, when the queue ends and who is listening. `/dj` keeps skips and stops to your DJs.
+    `/setup` creates a category, a request channel and a voice channel. People just type a song name there and it plays, while the dashboard message becomes the player: cover art, the next songs, when the queue ends and who is listening.
   </Card>
-  <Card title="Clean cards" icon="document">
-    Built with discord.js display components: text, dividers and cover art, with no header and no accent color.
+  <Card title="Made for busy servers" icon="approve-check">
+    A DJ role for skips and stops, a request channel that keeps music out of the rest of the chat, and players that survive a bot restart without stopping the music.
   </Card>
 </CardGrid>
 
@@ -37,51 +37,32 @@ import { Steps, Aside, CardGrid, Card } from '@astrojs/starlight/components';
 | `/queue` · `/remove` · `/move` · `/shuffle` | Manage the queue |
 | `/loop [mode]` · `/autoplay` | Loop the song or queue, keep playing related songs |
 | `/volume [level]` · `/filters [preset]` | Volume (0-200), bass boost, nightcore, 8D and more |
-| `/lyrics` | Lyrics of the current song (needs LavaLyrics) |
-| `/stop` · `/help` · `/ping` | Stop and leave, open the help menu, or check latency |
-| `/stats` | Bot, player and music server numbers |
+| `/lyrics` | Lyrics of the current song |
+| `/stop` · `/help` · `/ping` · `/stats` | Stop and leave, open the help menu, check latency or see the numbers |
 | `/setup create` · `/setup delete` | Server managers only: make the song request channel, or delete it again |
 | `/dj set` · `/dj clear` | Server managers only: pick who may skip, stop and change the sound |
 | `/reset` · `/summon` | Server managers only: force the player to stop, or move the bot to your channel |
 
 Only people in the bot's voice channel, or members who can manage the server, can control the music. With `/dj set`, skips, stops and sound changes are limited to that role, while everyone can still add songs. Anyone can look at the queue.
 
-## Run it yourself
-
-You need Node.js 20.12+ and a [Lavalink v4 server](../installation/).
+## Set up a song request channel
 
 <Steps>
 
-1. Clone the repository, build raya.js and install the bot:
+1. Invite the bot with the button above, so it can create channels and speak in voice.
 
-   ```bash
-   git clone https://github.com/neuzgg/raya.git
-   cd raya
-   npm install && npm run build
-   cd bot && npm install
-   ```
+2. Run `/setup create`. Raya makes a **Raya Music** category with a `#raya-requests` channel and a voice channel, and posts the dashboard there.
 
-2. Create an application in the [Discord Developer Portal](https://discord.com/developers/applications) and copy the bot token. Turn on the **Message Content** intent if you want song requests (typing a song name in the `/setup` channel); otherwise set `SONG_REQUESTS=false`.
+3. Join the voice channel and type a song name or paste a link in `#raya-requests`. The request is tidied away and the dashboard turns into the player.
 
-3. Copy `bot/.env.example` to `bot/.env` and fill in `DISCORD_TOKEN` and your Lavalink details.
-
-   <Aside type="caution">`bot/.env` is gitignored. Never put your token in `.env.example` or any other file you commit.</Aside>
-
-4. Register the slash commands and start the bot. It prints an invite link:
-
-   ```bash
-   npm run deploy
-   npm start
-   ```
+   <Aside type="tip">Music commands then only work in that channel, so the rest of the server stays quiet. `/setup disable` lifts that, `/setup delete` removes the channels.</Aside>
 
 </Steps>
 
-To restart without stopping the music, press `Ctrl+C` and start the bot again within a minute. Players are saved and picked up automatically ([how restarts work](../../guides/restarts/)).
+## Build your own
 
-## Make it yours
+Raya is just raya.js with a Discord front end, and everything it does is in the library:
 
-- **Emojis** are in `src/ui/emojis.js`. Swap in your own application emojis as `<:name:id>`.
-- **Every message** is built with one `card()` helper in `src/ui/components.js`, so the look stays consistent.
-- **The help menu** takes its categories and command rows from `src/commands/catalog.js`, and its news from `src/announcements.js`.
-- **The player** lives in `src/ui/panel.js`, and `src/music/panels.js` keeps one live player message per server.
-- **Tests** check every card against the design rules and run full `/play` → button flows against a Lavalink simulator: `npm test`.
+- the [quick start](../quick-start/) gets a bot playing in a few lines
+- the [example bot](https://github.com/neuzgg/raya/blob/main/examples/discordjs-bot.js) is a small, complete starting point
+- [restarts](../../guides/restarts/), [filters](../../guides/filters/), [autoplay](../../guides/autoplay/) and [voice status](../../guides/voice-status/) cover the features above
