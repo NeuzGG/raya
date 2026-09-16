@@ -32,8 +32,6 @@ jobs:
         env:
           SITE_URL: https://${{ github.repository_owner }}.github.io
           BASE_PATH: /${{ github.event.repository.name }}
-          # Optional: set a repository variable LIVE_FEED_URL to show the live "Playing right now" section
-          PUBLIC_LIVE_FEED_URL: ${{ vars.LIVE_FEED_URL }}
       - uses: actions/upload-pages-artifact@v5
         with:
           path: website/dist

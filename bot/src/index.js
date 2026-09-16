@@ -9,7 +9,7 @@ import {
   Options,
   PermissionFlagsBits,
 } from 'discord.js';
-import { Connectors, NowPlayingFeed, Raya, VERSION } from '../../dist/index.mjs';
+import { Connectors, Raya, VERSION } from '../../dist/index.mjs';
 import { commands } from './commands/index.js';
 import { ConfigError, loadConfig, loadEnvFile } from './config.js';
 import { createRouter } from './interactions/router.js';
@@ -145,35 +145,6 @@ function updatePresence() {
         : { type: ActivityType.Listening, name: '/play' },
     ],
   });
-}
-
-// ==================== Website: live now playing ====================
-
-if (config.feed) {
-  const feed = new NowPlayingFeed({
-    port: config.feed.port,
-    host: config.feed.host,
-    cors: config.feed.cors,
-    // Only the bot and the song are shared: no server names, channels or users.
-    bot: () =>
-      client.user
-        ? {
-            name: client.user.displayName,
-            avatar: client.user.displayAvatarURL({ extension: 'png', size: 256 }),
-            url: inviteUrl,
-          }
-        : null,
-  });
-  try {
-    await raya.use(feed);
-    log.info(`Live feed on http://localhost:${config.feed.port}/now-playing (CORS: ${config.feed.cors})`);
-  } catch (error) {
-    log.warn(
-      error.code === 'EADDRINUSE'
-        ? `Live feed disabled: port ${config.feed.port} is already in use. Set another LIVE_FEED_PORT in bot/.env.`
-        : `Live feed disabled: ${error.message}`,
-    );
-  }
 }
 
 // ==================== Shutdown ====================

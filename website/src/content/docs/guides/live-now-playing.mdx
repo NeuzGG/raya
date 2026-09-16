@@ -21,8 +21,6 @@ Lavalink  →  your bot (Raya + NowPlayingFeed)  →  your website
 
 ## Connect your bot
 
-<Aside type="tip">The [official Raya bot](../../getting-started/official-bot/) has this built in: set `LIVE_FEED_PORT=8787` in `bot/.env` and skip to step 2.</Aside>
-
 <Steps>
 
 1. **Add the feed to your bot.** `bot` is how your bot appears on the site. A function keeps the name and avatar up to date:
@@ -53,13 +51,11 @@ Lavalink  →  your bot (Raya + NowPlayingFeed)  →  your website
 
    It prints a `https://….trycloudflare.com` address. For a permanent address, use a named tunnel or a reverse proxy (Caddy, Nginx) with your own domain.
 
-4. **Point the website at it.**
-   - **GitHub Pages:** in your repository go to **Settings → Secrets and variables → Actions → Variables**, add `LIVE_FEED_URL` = `https://your-address/now-playing`, then re-run the **Deploy docs** workflow.
-   - **Anywhere else:** set `liveFeed` in `website/src/site.mjs`, or the `PUBLIC_LIVE_FEED_URL` environment variable when building.
+4. **Point your website at it.** Read the feed with a few lines of JavaScript: see [Show it on any website](#show-it-on-any-website).
 
 </Steps>
 
-The landing page then shows a **Now playing live** card, and the floating card in the hero shows the bot's real song. Without a feed, both stay hidden, so the site never shows fake data.
+While the bot is offline or nothing is playing, the feed says so, so your site never has to show fake data.
 
 ## Which song is shown
 

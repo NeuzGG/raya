@@ -3,8 +3,6 @@ import { highlight } from '../../scripts/highlight';
 import { link } from '../../utils/links';
 import { SITE } from '../../site.mjs';
 
-// The floating "now playing" card only exists when the bot's live feed is connected.
-const liveEnabled = Boolean((import.meta.env.PUBLIC_LIVE_FEED_URL || SITE.liveFeed || '').trim());
 
 const snippet = `import { Raya, Connectors } from 'raya.js';
 
@@ -86,18 +84,6 @@ await player.enqueue(await player.search('neon tide'));`;
         </div>
       </div>
 
-      {liveEnabled && (
-        <a class="float-card" href="#live" data-hero-now hidden>
-          <div class="art" data-hero-art><span data-hero-initial></span></div>
-          <div class="meta">
-            <span class="live-tag"><i></i>Live on the bot</span>
-            <strong data-hero-title></strong>
-            <span data-hero-author></span>
-            <div class="mini-progress"><i data-hero-fill></i></div>
-          </div>
-          <div class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
-        </a>
-      )}
     </div>
   </div>
 
@@ -105,8 +91,6 @@ await player.enqueue(await player.search('neon tide'));`;
 </section>
 
 <script>
-  import { livePosition, safeUrl, type LiveEventDetail } from '../../scripts/live-feed';
-
   // Install command switcher + copy
   const install = document.querySelector<HTMLElement>('[data-install]');
   if (install) {
@@ -170,56 +154,6 @@ await player.enqueue(await player.search('neon tide'));`;
     toastTimer = window.setInterval(next, 3200);
   }
 
-  // Real "now playing" from the bot's live feed (see LiveNowPlaying.astro)
-  const heroNow = document.querySelector<HTMLAnchorElement>('[data-hero-now]');
-  if (heroNow) {
-    let latest: LiveEventDetail | null = null;
-    let shownKey = '';
-    const fill = heroNow.querySelector<HTMLElement>('[data-hero-fill]')!;
-    const updateProgress = () => {
-      const now = latest?.snapshot?.nowPlaying;
-      if (!now || heroNow.hidden) return;
-      const position = livePosition(now, latest!.receivedAt);
-      fill.style.width = now.track.isStream ? '100%' : `${Math.min(100, (position / (now.track.duration || 1)) * 100)}%`;
-    };
-    window.addEventListener('raya:live', (event) => {
-      latest = (event as CustomEvent<LiveEventDetail>).detail;
-      const now = latest.status === 'offline' ? null : latest.snapshot?.nowPlaying ?? null;
-      heroNow.hidden = !now;
-      if (!now) {
-        shownKey = '';
-        return;
-      }
-      heroNow.classList.toggle('is-paused', now.paused);
-      const key = `${now.track.title}${now.track.uri}`;
-      if (key !== shownKey) {
-        const isChange = shownKey !== '';
-        shownKey = key;
-        heroNow.querySelector('[data-hero-title]')!.textContent = now.track.title;
-        heroNow.querySelector('[data-hero-author]')!.textContent = now.track.author;
-        heroNow.setAttribute('aria-label', `Live on the bot: ${now.track.title} by ${now.track.author}`);
-        const art = heroNow.querySelector<HTMLElement>('[data-hero-art]')!;
-        art.querySelector('img')?.remove();
-        heroNow.querySelector('[data-hero-initial]')!.textContent = now.track.title.charAt(0).toUpperCase();
-        const artwork = safeUrl(now.track.artworkUrl);
-        if (artwork) {
-          const img = document.createElement('img');
-          img.alt = '';
-          img.referrerPolicy = 'no-referrer';
-          img.addEventListener('error', () => img.remove());
-          img.src = artwork;
-          art.prepend(img);
-        }
-        if (isChange) {
-          clearInterval(toastTimer);
-          showToast('🎶', 'Now playing', `${now.track.title} · ${now.track.author}`);
-          toastTimer = window.setTimeout(startToasts, 6400);
-        }
-      }
-      updateProgress();
-    });
-    setInterval(updateProgress, 1000);
-  }
 
   if (typer) {
     const code = typer.querySelector<HTMLElement>('[data-code]')!;
@@ -700,146 +634,6 @@ await player.enqueue(await player.search('neon tide'));`;
     font-size: 0.85rem;
     color: var(--muted);
   }
-  .float-card {
-    position: absolute;
-    left: -34px;
-    top: -30px;
-    z-index: 2;
-    display: flex;
-    align-items: center;
-    gap: 0.7rem;
-    padding: 0.6rem 0.8rem 0.6rem 0.6rem;
-    border-radius: 16px;
-    border: 1px solid var(--border-strong);
-    background: color-mix(in srgb, var(--surface) 88%, transparent);
-    backdrop-filter: blur(12px);
-    box-shadow: var(--shadow-lg);
-    max-width: 280px;
-    animation: float 6s ease-in-out infinite, pop-in 0.6s var(--ease-spring);
-    transition: border-color 0.25s;
-  }
-  .float-card:hover {
-    border-color: color-mix(in srgb, var(--coral) 55%, var(--border-strong));
-  }
-  @keyframes float {
-    50% {
-      transform: translateY(-10px);
-    }
-  }
-  @keyframes pop-in {
-    from {
-      opacity: 0;
-      scale: 0.9;
-    }
-  }
-  .float-card .art {
-    position: relative;
-    flex: none;
-    display: grid;
-    place-items: center;
-    width: 44px;
-    height: 44px;
-    border-radius: 10px;
-    overflow: hidden;
-    background: linear-gradient(135deg, #ff4d8d, #ffb547);
-    color: #fff;
-    font-family: var(--display);
-    font-weight: 800;
-  }
-  .float-card .art img {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-  }
-  .float-card .meta {
-    display: grid;
-    min-width: 0;
-    line-height: 1.25;
-  }
-  .float-card strong,
-  .float-card [data-hero-author] {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .float-card strong {
-    font-size: 0.85rem;
-  }
-  .float-card span {
-    font-size: 0.75rem;
-    color: var(--muted);
-  }
-  .float-card .live-tag {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.3rem;
-    font-size: 0.62rem;
-    font-weight: 700;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--red);
-  }
-  .live-tag i {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: var(--red);
-    animation: blink 1.4s steps(1) infinite;
-  }
-  .mini-progress {
-    width: 120px;
-    max-width: 100%;
-    height: 3px;
-    margin-top: 0.35rem;
-    border-radius: 3px;
-    background: var(--surface-3);
-    overflow: hidden;
-  }
-  .mini-progress i {
-    display: block;
-    width: 0;
-    height: 100%;
-    background: var(--grad);
-    transition: width 1s linear;
-  }
-  .float-card.is-paused .mini-progress i {
-    background: var(--faint);
-  }
-  .float-card.is-paused .eq i {
-    animation: none;
-    transform: scaleY(0.25);
-  }
-  .eq {
-    display: flex;
-    align-items: flex-end;
-    gap: 3px;
-    height: 20px;
-    margin-left: 0.3rem;
-  }
-  .eq i {
-    width: 3px;
-    height: 100%;
-    border-radius: 2px;
-    background: var(--coral);
-    transform-origin: bottom;
-    animation: eq 0.9s ease-in-out infinite alternate;
-  }
-  .eq i:nth-child(2) {
-    animation-delay: -0.3s;
-  }
-  .eq i:nth-child(3) {
-    animation-delay: -0.6s;
-  }
-  .eq i:nth-child(4) {
-    animation-delay: -0.15s;
-  }
-  @keyframes eq {
-    from {
-      transform: scaleY(0.25);
-    }
-  }
   .visualizer {
     position: absolute;
     left: 0;
@@ -858,19 +652,11 @@ await player.enqueue(await player.search('neon tide'));`;
     .window {
       transform: none;
     }
-    .float-card {
-      left: auto;
-      right: 8px;
-      top: -36px;
-    }
     .toasts {
       right: 8px;
     }
   }
   @media (max-width: 520px) {
-    .float-card {
-      display: none;
-    }
     .toasts {
       left: 8px;
       right: 8px;

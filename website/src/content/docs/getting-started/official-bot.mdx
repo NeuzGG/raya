@@ -17,9 +17,6 @@ import { Steps, Aside, CardGrid, Card } from '@astrojs/starlight/components';
   <Card title="Clean cards" icon="document">
     Built with discord.js display components: text and dividers only, no header, no accent color.
   </Card>
-  <Card title="Live on the website" icon="rocket">
-    The bot shares the song it's playing with this site through `NowPlayingFeed`, with an Add to Discord button.
-  </Card>
 </CardGrid>
 
 ## Commands
@@ -70,10 +67,6 @@ You need Node.js 20.12+ and a [Lavalink v4 server](../installation/).
 </Steps>
 
 To restart without stopping the music, press `Ctrl+C` and start the bot again within a minute. Players are saved and picked up automatically ([how restarts work](../../guides/restarts/)).
-
-## Show it on the website
-
-Set `LIVE_FEED_PORT=8787` in `bot/.env`. The bot then serves its live status at `http://localhost:8787/now-playing`. Put that on a public HTTPS address, set the `LIVE_FEED_URL` repository variable, and redeploy the site. The [live now playing guide](../../guides/live-now-playing/) walks through each step.
 
 ## Make it yours
 

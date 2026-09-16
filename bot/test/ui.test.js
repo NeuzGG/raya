@@ -199,19 +199,16 @@ describe('config', () => {
     assert.equal(config.searchSource, 'youtube');
     assert.equal(config.player.volume, 80);
     assert.equal(config.player.leaveWhenEmptyAfter, 60_000);
-    assert.equal(config.feed, null, 'the website feed is off unless a port is set');
     assert.deepEqual(config.nodes, [{ name: 'main', host: 'localhost', port: 2333, password: 'youshallnotpass', secure: false }]);
   });
 
-  it('reads nodes, the live feed and validates numbers', () => {
+  it('reads nodes and validates numbers', () => {
     const config = loadConfig({
       DISCORD_TOKEN: 'x',
-      LAVALINK_NODES: '[{"name":"eu","host":"eu.example.com","port":443,"password":"p","secure":true}]',
-      LIVE_FEED_PORT: '8787',
+      LAVALINK_NODES: '[{\"name\":\"eu\",\"host\":\"eu.example.com\",\"port\":443,\"password\":\"p\",\"secure\":true}]',
       LEAVE_AFTER_QUEUE_END: '0',
     });
     assert.equal(config.nodes[0].host, 'eu.example.com');
-    assert.deepEqual(config.feed, { port: 8787, host: '0.0.0.0', cors: 'https://neuzgg.github.io' });
     assert.equal(config.player.leaveAfterQueueEnd, 0);
     assert.throws(() => loadConfig({ DISCORD_TOKEN: 'x', DEFAULT_VOLUME: 'loud' }), /DEFAULT_VOLUME/);
     assert.throws(() => loadConfig({ DISCORD_TOKEN: 'x', LAVALINK_NODES: '{}' }), /LAVALINK_NODES/);

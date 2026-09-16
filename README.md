@@ -149,7 +149,7 @@ await raya.use(new NowPlayingFeed({
 
 [**Raya Bot**](bot/) is a complete music bot built with raya.js and discord.js display components:
 - one live player per server, with buttons for playback, loop, autoplay, sound, queue and lyrics
-- search suggestions, restart-proof players, and a live now-playing feed for the website
+- search suggestions, autocomplete, filters and lyrics, with restart-proof players
 
 Run it yourself or use it as a starting point. See [`bot/README.md`](bot/README.md). For something smaller, there's also a [minimal example](examples/discordjs-bot.js).
 

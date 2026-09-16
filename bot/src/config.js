@@ -79,8 +79,6 @@ export function loadConfig(env = process.env) {
   const token = text(env, 'DISCORD_TOKEN');
   if (!token) throw new ConfigError('DISCORD_TOKEN is missing. Copy bot/.env.example to bot/.env and add your bot token.');
 
-  const feedPort = text(env, 'LIVE_FEED_PORT') === null ? null : integer(env, 'LIVE_FEED_PORT', null, 1, 65535);
-
   return {
     token,
     devGuildId: text(env, 'DEV_GUILD_ID'),
@@ -94,11 +92,6 @@ export function loadConfig(env = process.env) {
       maxQueueSize: integer(env, 'MAX_QUEUE_SIZE', 1000, 1, 10000),
     },
     voiceStatus: bool(env, 'VOICE_STATUS', true),
-    feed: feedPort === null ? null : {
-      port: feedPort,
-      host: text(env, 'LIVE_FEED_HOST', '0.0.0.0'),
-      cors: text(env, 'LIVE_FEED_CORS', 'https://neuzgg.github.io'),
-    },
     links: {
       website: url(env, 'WEBSITE_URL', 'https://neuzgg.github.io/raya/'),
       github: url(env, 'GITHUB_URL', 'https://github.com/neuzgg/raya'),

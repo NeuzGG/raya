@@ -6,7 +6,6 @@ The official Raya music bot, built with [raya.js](../README.md) and discord.js [
 - **Buttons for everything:** previous, pause, skip, shuffle, stop, loop, autoplay, sound board (volume and filters), queue and lyrics.
 - **Clean cards:** text and dividers only, with no header and no accent color.
 - **Restart-proof:** `Ctrl+C` saves every player and the music keeps playing while the bot restarts.
-- **Connected to the website:** the Raya docs site shows the bot and the song it's playing, live.
 - **Safe by default:** only people in the bot's voice channel (or server managers) can control the music; song titles can't inject markdown or mentions, and the bot never pings anyone.
 
 ## Commands
@@ -51,16 +50,6 @@ Invite the bot with the link it prints. It asks for View Channel, Send Messages,
 
 To restart without stopping the music, press `Ctrl+C` (or send `SIGTERM`) and start the bot again within a minute. Players are saved to `bot/data/snapshot.json` and picked up on the next start.
 
-## Show the bot on the website
-
-With `LIVE_FEED_PORT` set, the bot serves its live status at `http://localhost:8787/now-playing`. It shares only the bot's name, avatar and invite link, plus the song: no server names, channels or users.
-
-1. Put the feed on a public HTTPS address, for example with a Cloudflare tunnel: `cloudflared tunnel --url http://localhost:8787`
-2. In the GitHub repo, go to **Settings → Secrets and variables → Actions → Variables** and add `LIVE_FEED_URL` with the address plus `/now-playing`, e.g. `https://example.trycloudflare.com/now-playing`
-3. Re-run the **Docs** workflow. The home page now shows the bot live, with an **Add to Discord** button.
-
-`LIVE_FEED_CORS` must match the site's origin (`https://neuzgg.github.io` by default). See the [live now playing guide](https://neuzgg.github.io/raya/guides/live-now-playing/) for details.
-
 ## Configuration
 
 Every option is in [`.env.example`](.env.example):
@@ -77,7 +66,6 @@ Every option is in [`.env.example`](.env.example):
 | `LEAVE_AFTER_QUEUE_END` | `180` | Seconds, `0` = never |
 | `MAX_QUEUE_SIZE` | `1000` | |
 | `VOICE_STATUS` | `true` | Show the song as the voice channel status |
-| `LIVE_FEED_PORT` `LIVE_FEED_HOST` `LIVE_FEED_CORS` | off, `0.0.0.0`, `https://neuzgg.github.io` | Website feed |
 | `WEBSITE_URL` `GITHUB_URL` `SUPPORT_URL` | Raya links | Buttons in `/help` |
 | `RAYA_DEBUG` | `false` | Verbose logs |
 
